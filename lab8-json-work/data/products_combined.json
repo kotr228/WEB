@@ -1,0 +1,47 @@
+[
+  {
+    "id": 4,
+    "name": "Клавіатура Logitech",
+    "price": 1200
+  },
+  {
+    "id": 5,
+    "name": "Миша Razer",
+    "price": 1800
+  },
+  {
+    "id": 8,
+    "name": "Веб-камера Logitech",
+    "price": 2200
+  },
+  {
+    "id": 9,
+    "name": "SSD Samsung 1TB",
+    "price": 3200
+  },
+  {
+    "id": 3,
+    "name": "Навушники Sony",
+    "price": 3500
+  },
+  {
+    "id": 7,
+    "name": "Принтер HP LaserJet",
+    "price": 5500
+  },
+  {
+    "id": 6,
+    "name": "Монітор Dell 27\"",
+    "price": 8500
+  },
+  {
+    "id": 2,
+    "name": "Смартфон Samsung Galaxy",
+    "price": 15000
+  },
+  {
+    "id": 1,
+    "name": "Ноутбук ASUS",
+    "price": 25000
+  }
+]

@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "name": "Ноутбук ASUS",
+    "price": 25000
+  },
+  {
+    "id": 2,
+    "name": "Смартфон Samsung Galaxy",
+    "price": 15000
+  },
+  {
+    "id": 3,
+    "name": "Навушники Sony",
+    "price": 3500
+  },
+  {
+    "id": 4,
+    "name": "Клавіатура Logitech",
+    "price": 1200
+  },
+  {
+    "id": 5,
+    "name": "Миша Razer",
+    "price": 1800
+  }
+]

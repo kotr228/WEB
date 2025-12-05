@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Завдання 3: Завантаження постів з API</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .controls {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0 5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .post {
+            background: #fafafa;
+            border-left: 4px solid #667eea;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .post:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateX(4px);
+        }
+
+        .post h3 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .post .meta {
+            color: #999;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .post .body {
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+
+        .error {
+            background: #fee;
+            border-left: 4px solid #f44;
+            padding: 1rem;
+            border-radius: 8px;
+            color: #c00;
+            margin-bottom: 1rem;
+        }
+
+        #output {
+            min-height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Завантаження постів з JSONPlaceholder API</h1>
+
+        <div class="controls">
+            <button id="fetchBtn" class="btn">🌐 Завантажити пости</button>
+            <button id="downloadBtn" class="btn" disabled>💾 Зберегти JSON</button>
+        </div>
+
+        <div id="info" class="info" style="display: none;"></div>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        const API_URL = 'https://jsonplaceholder.typicode.com/posts';
+        const USER_ID = 5;
+        let filteredPosts = [];
+
+        const fetchBtn = document.getElementById('fetchBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const output = document.getElementById('output');
+        const info = document.getElementById('info');
+
+        /**
+         * Завантаження постів з API
+         */
+        async function fetchPosts() {
+            try {
+                fetchBtn.disabled = true;
+                output.innerHTML = '<div class="loading">⏳ Завантаження даних...</div>';
+
+                const response = await fetch(API_URL);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
+                const allPosts = await response.json();
+
+                // Фільтруємо за userId
+                filteredPosts = allPosts.filter(post => post.userId === USER_ID);
+
+                // Відображаємо інформацію
+                showInfo(allPosts.length, filteredPosts.length);
+
+                // Відображаємо пости
+                displayPosts(filteredPosts);
+
+                // Активуємо кнопку збереження
+                downloadBtn.disabled = false;
+
+            } catch (error) {
+                output.innerHTML = `
+                    <div class="error">
+                        ❌ Помилка завантаження: ${error.message}
+                    </div>
+                `;
+            } finally {
+                fetchBtn.disabled = false;
+            }
+        }
+
+        /**
+         * Відображення інформації
+         */
+        function showInfo(total, filtered) {
+            info.style.display = 'block';
+            info.innerHTML = `
+                📊 <strong>Статистика:</strong><br>
+                Всього постів: ${total}<br>
+                Відфільтровано для користувача ${USER_ID}: ${filtered}
+            `;
+        }
+
+        /**
+         * Відображення постів
+         */
+        function displayPosts(posts) {
+            if (posts.length === 0) {
+                output.innerHTML = '<div class="info">Немає постів для відображення</div>';
+                return;
+            }
+
+            const html = posts.map(post => `
+                <div class="post">
+                    <h3>${post.title}</h3>
+                    <div class="meta">ID: ${post.id} | User ID: ${post.userId}</div>
+                    <div class="body">${post.body}</div>
+                </div>
+            `).join('');
+
+            output.innerHTML = html;
+        }
+
+        /**
+         * Завантаження JSON файлу
+         */
+        function downloadJSON() {
+            const json = JSON.stringify(filteredPosts, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'user_posts.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert('✅ Файл user_posts.json збережено!');
+        }
+
+        // Обробники подій
+        fetchBtn.addEventListener('click', fetchPosts);
+        downloadBtn.addEventListener('click', downloadJSON);
+
+        // Автоматичне завантаження при відкритті сторінки
+        window.addEventListener('load', () => {
+            setTimeout(fetchPosts, 500);
+        });
+    </script>
+</body>
+</html>
