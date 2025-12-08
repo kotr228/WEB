@@ -18,5 +18,10 @@
     "id": 4,
     "name": "Тарас Шевченко",
     "email": "taras.shevchenko@example.com"
+  },
+  {
+    "id": 5,
+    "name": "Микола",
+    "email": "mikola@gmail.com"
   }
 ]
