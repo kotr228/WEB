@@ -1,0 +1,22 @@
+{
+  "name": "lab9-promises",
+  "version": "1.0.0",
+  "description": "Лабораторна робота №9: Обробка промісів та промісіфікація",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "task1": "node task1-parallel-fetch.js",
+    "task2": "node task2-file-chain.js",
+    "task3": "node task3-promisify-delay.js",
+    "task4": "node task4-promisify-multi.js",
+    "all": "npm run task1 && npm run task2 && npm run task3 && npm run task4"
+  },
+  "keywords": [
+    "promises",
+    "async",
+    "javascript",
+    "promisify"
+  ],
+  "author": "",
+  "license": "MIT"
+}
