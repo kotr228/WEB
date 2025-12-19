@@ -3,20 +3,26 @@
   "version": "1.0.0",
   "description": "Лабораторна робота №9: Обробка промісів та промісіфікація",
   "type": "module",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "task1": "node task1-parallel-fetch.js",
     "task2": "node task2-file-chain.js",
     "task3": "node task3-promisify-delay.js",
-    "task4": "node task4-promisify-multi.js",
-    "all": "npm run task1 && npm run task2 && npm run task3 && npm run task4"
+    "task4": "node task4-promisify-multi.js"
   },
   "keywords": [
     "promises",
     "async",
     "javascript",
-    "promisify"
+    "promisify",
+    "express",
+    "web"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
 }
