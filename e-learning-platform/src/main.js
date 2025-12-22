@@ -1121,10 +1121,10 @@ function showCreateCourseForm() {
   // Збираємо контейнер
   appendChildren(formContainer, formTitle, form)
 
-  // Вставляємо форму після кнопки "Додати курс"
-  const addBtn = document.getElementById('add-course-btn')
-  if (addBtn && addBtn.nextSibling) {
-    container.insertBefore(formContainer, addBtn.nextSibling)
+  // Вставляємо форму на початок контейнера сторінки курсів
+  const coursesList = document.getElementById('courses-list')
+  if (coursesList && coursesList.parentElement) {
+    coursesList.parentElement.insertBefore(formContainer, coursesList)
   }
 }
 
