@@ -287,6 +287,137 @@ function getFilteredCourses() {
 }
 
 // =========================================
+// Робота з масивами та об'єктами (Модуль 4)
+// =========================================
+
+/**
+ * Розрахунок статистики за допомогою reduce
+ */
+function calculateStatistics() {
+  // Використання reduce для підрахунку різних метрик
+  const stats = coursesData.reduce((acc, course) => {
+    // Деструктуризація (destructuring)
+    const { enrolled, progress, lessons, isCustom } = course
+
+    // Лічильники
+    acc.totalCourses++
+    if (enrolled) acc.enrolledCourses++
+    if (isCustom) acc.customCourses++
+    if (progress === 100) acc.completedCourses++
+
+    // Підрахунок уроків
+    acc.totalLessons += lessons.length
+    acc.completedLessons += lessons.filter(l => l.completed).length
+
+    // Сума прогресу для середнього
+    if (enrolled) {
+      acc.totalProgress += progress
+    }
+
+    return acc
+  }, {
+    totalCourses: 0,
+    enrolledCourses: 0,
+    customCourses: 0,
+    completedCourses: 0,
+    totalLessons: 0,
+    completedLessons: 0,
+    totalProgress: 0
+  })
+
+  // Обчислюємо середній прогрес
+  stats.avgProgress = stats.enrolledCourses > 0
+    ? Math.round(stats.totalProgress / stats.enrolledCourses)
+    : 0
+
+  return stats
+}
+
+/**
+ * Групування курсів за викладачами (використання reduce + Object)
+ */
+function groupCoursesByInstructor() {
+  return coursesData.reduce((groups, course) => {
+    const { instructor } = course
+
+    // Якщо групи для викладача ще немає, створюємо
+    if (!groups[instructor]) {
+      groups[instructor] = []
+    }
+
+    // Додаємо курс до групи
+    groups[instructor].push(course)
+
+    return groups
+  }, {})
+}
+
+/**
+ * Топ викладачів за кількістю курсів (array methods chaining)
+ */
+function getTopInstructors() {
+  // Object.entries для перетворення об'єкта в масив
+  return Object.entries(groupCoursesByInstructor())
+    // map для трансформації даних
+    .map(([instructor, courses]) => ({
+      instructor,
+      coursesCount: courses.length,
+      enrolledCount: courses.filter(c => c.enrolled).length,
+      courses: courses.map(c => c.title) // витягуємо тільки назви
+    }))
+    // sort для сортування за кількістю курсів
+    .sort((a, b) => b.coursesCount - a.coursesCount)
+    // slice для отримання топ-3
+    .slice(0, 3)
+}
+
+/**
+ * Отримання унікальних викладачів (Set + spread operator)
+ */
+function getUniqueInstructors() {
+  // Spread operator + Set для унікальних значень
+  return [...new Set(coursesData.map(c => c.instructor))]
+}
+
+/**
+ * Фільтрація курсів з умовами (some, every)
+ */
+function getCoursesAnalytics() {
+  return {
+    // some - чи є хоч один курс з прогресом 100%
+    hasCompletedCourses: coursesData.some(c => c.progress === 100),
+
+    // every - чи всі курси мають уроки
+    allCoursesHaveLessons: coursesData.every(c => c.lessons && c.lessons.length > 0),
+
+    // find - перший курс з прогресом > 0
+    courseInProgress: coursesData.find(c => c.progress > 0 && c.progress < 100),
+
+    // findIndex - індекс першого незаписаного курсу
+    firstAvailableCourseIndex: coursesData.findIndex(c => !c.enrolled)
+  }
+}
+
+/**
+ * Клонування та модифікація об'єктів (spread operator)
+ */
+function cloneCourseWithProgress(courseId, newProgress) {
+  const course = coursesData.find(c => c.id === courseId)
+
+  if (!course) return null
+
+  // Spread operator для створення копії + оновлення
+  return {
+    ...course,
+    progress: newProgress,
+    lessons: course.lessons.map(lesson => ({
+      ...lesson,
+      completed: newProgress === 100
+    }))
+  }
+}
+
+// =========================================
 // Навігація між сторінками
 // =========================================
 function navigateTo(pageName) {
@@ -1206,70 +1337,212 @@ function renderMyCourses() {
 }
 
 // =========================================
-// Рендеринг прогресу
+// Рендеринг прогресу (оновлено для Модуля 4)
 // =========================================
 function renderProgress() {
   const progressStats = document.getElementById('progress-stats')
-
   if (!progressStats) return
 
+  // Очищаємо контейнер
+  progressStats.innerHTML = ''
+
+  // Модуль 4: Використання reduce, map, filter
+  const stats = calculateStatistics()
+  const topInstructors = getTopInstructors()
+  const analytics = getCoursesAnalytics()
+
+  // Основна статистика (використання деструктуризації)
+  const {
+    totalCourses,
+    enrolledCourses,
+    completedCourses,
+    customCourses,
+    totalLessons,
+    completedLessons,
+    avgProgress
+  } = stats
+
+  // Секція 1: Загальна статистика (Grid з карток)
+  const statsSection = createElement('div', [])
+  statsSection.style.cssText = 'margin-bottom: 2rem;'
+
+  const statsTitle = createElement('h3', [])
+  setText(statsTitle, '📊 Загальна статистика')
+  statsTitle.style.cssText = 'margin-bottom: 1.5rem; color: var(--primary-color);'
+
+  const statsGrid = createElement('div', [])
+  statsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;'
+
+  // Масив статистичних карток (демонстрація map)
+  const statsCards = [
+    { icon: '📚', value: totalCourses, label: 'Всього курсів', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
+    { icon: '✅', value: enrolledCourses, label: 'Записано', gradient: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))' },
+    { icon: '🎯', value: completedCourses, label: 'Завершено', gradient: 'linear-gradient(135deg, var(--success-color), #059669)' },
+    { icon: '⭐', value: customCourses, label: 'Власних', gradient: 'linear-gradient(135deg, var(--warning-color), #d97706)' },
+    { icon: '📖', value: totalLessons, label: 'Всього уроків', gradient: 'linear-gradient(135deg, #f093fb, #f5576c)' },
+    { icon: '✓', value: completedLessons, label: 'Уроків пройдено', gradient: 'linear-gradient(135deg, #4facfe, #00f2fe)' }
+  ]
+
+  // Використання map для створення карток
+  statsCards.forEach(({ icon, value, label, gradient }) => {
+    const card = createElement('div', [])
+    card.style.cssText = `background: ${gradient}; color: white; padding: 1.5rem; border-radius: 12px; text-align: center; box-shadow: var(--shadow);`
+
+    const iconDiv = createElement('div', [])
+    setText(iconDiv, icon)
+    iconDiv.style.cssText = 'font-size: 2rem; margin-bottom: 0.5rem;'
+
+    const valueDiv = createElement('div', [])
+    setText(valueDiv, value.toString())
+    valueDiv.style.cssText = 'font-size: 2.5rem; font-weight: 700; margin-bottom: 0.25rem;'
+
+    const labelDiv = createElement('div', [])
+    setText(labelDiv, label)
+    labelDiv.style.cssText = 'opacity: 0.9; font-size: 0.875rem;'
+
+    appendChildren(card, iconDiv, valueDiv, labelDiv)
+    statsGrid.appendChild(card)
+  })
+
+  appendChildren(statsSection, statsTitle, statsGrid)
+
+  // Секція 2: Топ викладачів (використання Object.entries, map, sort, slice)
+  if (topInstructors.length > 0) {
+    const instructorsSection = createElement('div', [])
+    instructorsSection.style.cssText = 'margin-bottom: 2rem;'
+
+    const instructorsTitle = createElement('h3', [])
+    setText(instructorsTitle, '👨‍🏫 Топ викладачів')
+    instructorsTitle.style.cssText = 'margin-bottom: 1.5rem; color: var(--primary-color);'
+
+    const instructorsGrid = createElement('div', [])
+    instructorsGrid.style.cssText = 'display: grid; gap: 1rem;'
+
+    // Використання forEach з деструктуризацією
+    topInstructors.forEach(({ instructor, coursesCount, enrolledCount, courses }, index) => {
+      const card = createElement('div', [])
+      card.style.cssText = 'background: white; padding: 1.5rem; border-radius: 12px; box-shadow: var(--shadow);'
+
+      const header = createElement('div', [])
+      header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;'
+
+      const nameDiv = createElement('div', [])
+      nameDiv.style.cssText = 'font-weight: 700; color: var(--text-color); font-size: 1.1rem;'
+      setText(nameDiv, `${index + 1}. ${instructor}`)
+
+      const badge = createElement('span', [])
+      badge.style.cssText = 'background: var(--primary-color); color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.875rem;'
+      setText(badge, `${coursesCount} курс${coursesCount > 1 ? 'и' : ''}`)
+
+      appendChildren(header, nameDiv, badge)
+
+      const info = createElement('div', [])
+      info.style.cssText = 'color: #6b7280; font-size: 0.875rem; margin-bottom: 0.5rem;'
+      setText(info, `Записано на ${enrolledCount} з ${coursesCount}`)
+
+      // Список курсів (використання join)
+      const coursesList = createElement('div', [])
+      coursesList.style.cssText = 'color: #6b7280; font-size: 0.875rem;'
+      setText(coursesList, courses.join(', '))
+
+      appendChildren(card, header, info, coursesList)
+      instructorsGrid.appendChild(card)
+    })
+
+    appendChildren(instructorsSection, instructorsTitle, instructorsGrid)
+    progressStats.appendChild(instructorsSection)
+  }
+
+  // Секція 3: Прогрес по курсах (filter + map)
   const enrolledCourses = coursesData.filter(c => c.enrolled)
-  const totalCourses = enrolledCourses.length
-  const completedCourses = enrolledCourses.filter(c => c.progress === 100).length
-  const avgProgress = totalCourses > 0
-    ? Math.round(enrolledCourses.reduce((sum, c) => sum + c.progress, 0) / totalCourses)
-    : 0
 
-  progressStats.innerHTML = `
-    <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
-      <div style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; padding: 2rem; border-radius: 12px; text-align: center;">
-        <div style="font-size: 3rem; font-weight: 700;">${totalCourses}</div>
-        <div style="opacity: 0.9;">Всього курсів</div>
-      </div>
-      <div style="background: linear-gradient(135deg, var(--success-color), #059669); color: white; padding: 2rem; border-radius: 12px; text-align: center;">
-        <div style="font-size: 3rem; font-weight: 700;">${completedCourses}</div>
-        <div style="opacity: 0.9;">Завершено</div>
-      </div>
-      <div style="background: linear-gradient(135deg, var(--warning-color), #d97706); color: white; padding: 2rem; border-radius: 12px; text-align: center;">
-        <div style="font-size: 3rem; font-weight: 700;">${avgProgress}%</div>
-        <div style="opacity: 0.9;">Середній прогрес</div>
-      </div>
-    </div>
+  if (enrolledCourses.length > 0) {
+    const coursesSection = createElement('div', [])
+    coursesSection.style.cssText = 'margin-bottom: 2rem;'
 
-    ${enrolledCourses.length > 0 ? `
-      <h3 style="margin-bottom: 1.5rem;">Детальний прогрес по курсах:</h3>
-      ${enrolledCourses.map(course => `
-        <div style="background: white; padding: 1.5rem; margin-bottom: 1rem; border-radius: 12px; box-shadow: var(--shadow);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: var(--text-color);">${course.icon} ${course.title}</h4>
-            <span style="font-weight: 700; color: var(--primary-color);">${course.progress}%</span>
-          </div>
-          <div style="background: #e5e7eb; height: 12px; border-radius: 6px; overflow: hidden;">
-            <div style="background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); height: 100%; width: ${course.progress}%; transition: width 0.3s ease;"></div>
-          </div>
-          <div style="margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;">
-            ${course.lessons.filter(l => l.completed).length} з ${course.lessons.length} уроків завершено
-          </div>
-        </div>
-      `).join('')}
-    ` : `
-      <div style="text-align: center; padding: 3rem; background: white; border-radius: 12px;">
-        <p style="font-size: 1.2rem; color: #6b7280;">
-          Почніть навчання, щоб побачити свій прогрес!
-          <a href="#" data-page="courses" style="color: var(--primary-color);">Переглянути курси</a>
-        </p>
-      </div>
-    `}
-  `
+    const coursesTitle = createElement('h3', [])
+    setText(coursesTitle, `📈 Детальний прогрес (${avgProgress}% середній)`)
+    coursesTitle.style.cssText = 'margin-bottom: 1.5rem; color: var(--primary-color);'
 
-  // Обробник для посилання на курси
-  const link = progressStats.querySelector('a[data-page="courses"]')
-  if (link) {
+    // Використання map для створення прогрес-барів
+    enrolledCourses.forEach(course => {
+      const progressCard = createElement('div', [])
+      progressCard.style.cssText = 'background: white; padding: 1.5rem; margin-bottom: 1rem; border-radius: 12px; box-shadow: var(--shadow);'
+
+      const headerDiv = createElement('div', [])
+      headerDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;'
+
+      const titleDiv = createElement('h4', [])
+      titleDiv.style.cssText = 'margin: 0; color: var(--text-color);'
+      setText(titleDiv, `${course.icon} ${course.title}`)
+
+      const percentDiv = createElement('span', [])
+      percentDiv.style.cssText = 'font-weight: 700; color: var(--primary-color);'
+      setText(percentDiv, `${course.progress}%`)
+
+      appendChildren(headerDiv, titleDiv, percentDiv)
+
+      // Прогрес-бар
+      const progressBar = createElement('div', [])
+      progressBar.style.cssText = 'background: #e5e7eb; height: 12px; border-radius: 6px; overflow: hidden;'
+
+      const progressFill = createElement('div', [])
+      progressFill.style.cssText = `background: linear-gradient(90deg, var(--primary-color), var(--secondary-color)); height: 100%; width: ${course.progress}%; transition: width 0.3s ease;`
+
+      progressBar.appendChild(progressFill)
+
+      // Інфо про уроки (використання filter)
+      const lessonsInfo = createElement('div', [])
+      lessonsInfo.style.cssText = 'margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;'
+      const completedCount = course.lessons.filter(l => l.completed).length
+      setText(lessonsInfo, `${completedCount} з ${course.lessons.length} уроків завершено`)
+
+      appendChildren(progressCard, headerDiv, progressBar, lessonsInfo)
+      coursesSection.appendChild(progressCard)
+    })
+
+    appendChildren(coursesSection, coursesTitle)
+    progressStats.appendChild(coursesSection)
+  }
+
+  // Додаємо всі секції
+  progressStats.insertBefore(statsSection, progressStats.firstChild)
+
+  // Якщо немає записаних курсів
+  if (enrolledCourses.length === 0) {
+    const emptyDiv = createElement('div', [])
+    emptyDiv.style.cssText = 'text-align: center; padding: 3rem; background: white; border-radius: 12px; margin-top: 2rem;'
+
+    const emptyIcon = createElement('div', [])
+    emptyIcon.style.cssText = 'font-size: 4rem; margin-bottom: 1rem;'
+    setText(emptyIcon, '📚')
+
+    const emptyText = createElement('p', [])
+    emptyText.style.cssText = 'font-size: 1.2rem; color: #6b7280;'
+    setText(emptyText, 'Почніть навчання, щоб побачити свій прогрес! ')
+
+    const link = createElement('a', [])
+    link.href = '#'
+    link.setAttribute('data-page', 'courses')
+    link.style.color = 'var(--primary-color)'
+    setText(link, 'Переглянути курси')
+
     link.addEventListener('click', (e) => {
       e.preventDefault()
       navigateTo('courses')
     })
+
+    emptyText.appendChild(link)
+    appendChildren(emptyDiv, emptyIcon, emptyText)
+    progressStats.appendChild(emptyDiv)
   }
+
+  // Консольний вивід аналітики (для демонстрації)
+  console.log('📊 Модуль 4: Аналітика курсів')
+  console.log('Статистика:', stats)
+  console.log('Топ викладачів:', topInstructors)
+  console.log('Унікальні викладачі:', getUniqueInstructors())
+  console.log('Аналітика:', analytics)
 }
 
 // =========================================
