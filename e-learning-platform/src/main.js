@@ -246,6 +246,197 @@ function dispatchCustomEvent(eventName, detail = {}) {
 }
 
 // =========================================
+// Валідація форм (Модуль 5)
+// =========================================
+
+/**
+ * Validation Rules - правила валідації
+ */
+const ValidationRules = {
+  required: (value) => value.trim() !== '',
+  email: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+  minLength: (value, min) => value.length >= min,
+  maxLength: (value, max) => value.length <= max,
+  pattern: (value, regex) => regex.test(value),
+  url: (value) => {
+    try {
+      new URL(value)
+      return true
+    } catch {
+      return false
+    }
+  },
+  number: (value) => !isNaN(parseFloat(value)) && isFinite(value),
+  min: (value, min) => parseFloat(value) >= min,
+  max: (value, max) => parseFloat(value) <= max,
+  range: (value, min, max) => parseFloat(value) >= min && parseFloat(value) <= max
+}
+
+/**
+ * Показує помилку валідації для поля
+ */
+function showFieldError(field, message) {
+  // Видаляємо попередню помилку, якщо є
+  clearFieldError(field)
+
+  // Додаємо клас помилки до поля
+  field.classList.add('field-error')
+  field.setAttribute('aria-invalid', 'true')
+
+  // Створюємо елемент помилки
+  const errorDiv = createElement('div', ['error-message'])
+  errorDiv.id = `${field.id}-error`
+  errorDiv.setAttribute('role', 'alert')
+  setText(errorDiv, `⚠️ ${message}`)
+
+  // Додаємо помилку після поля
+  field.parentElement.appendChild(errorDiv)
+
+  // Accessibility: зв'язуємо поле з повідомленням про помилку
+  field.setAttribute('aria-describedby', errorDiv.id)
+}
+
+/**
+ * Очищає помилку валідації для поля
+ */
+function clearFieldError(field) {
+  field.classList.remove('field-error')
+  field.removeAttribute('aria-invalid')
+  field.removeAttribute('aria-describedby')
+
+  const errorDiv = field.parentElement.querySelector('.error-message')
+  if (errorDiv) {
+    errorDiv.remove()
+  }
+}
+
+/**
+ * Валідує поле на основі його атрибутів та користувацьких правил
+ */
+function validateField(field, customRules = {}) {
+  const value = field.value
+  const fieldName = field.getAttribute('data-label') || field.placeholder || 'Поле'
+
+  // HTML5 валідація через Constraint Validation API
+  if (!field.checkValidity()) {
+    const validity = field.validity
+
+    if (validity.valueMissing) {
+      showFieldError(field, `${fieldName} є обов'язковим`)
+      return false
+    }
+    if (validity.typeMismatch) {
+      if (field.type === 'email') {
+        showFieldError(field, 'Введіть коректну email адресу')
+      } else if (field.type === 'url') {
+        showFieldError(field, 'Введіть коректний URL')
+      } else {
+        showFieldError(field, `Невірний формат для ${fieldName}`)
+      }
+      return false
+    }
+    if (validity.tooShort) {
+      showFieldError(field, `Мінімальна довжина: ${field.minLength} символів`)
+      return false
+    }
+    if (validity.tooLong) {
+      showFieldError(field, `Максимальна довжина: ${field.maxLength} символів`)
+      return false
+    }
+    if (validity.rangeUnderflow) {
+      showFieldError(field, `Мінімальне значення: ${field.min}`)
+      return false
+    }
+    if (validity.rangeOverflow) {
+      showFieldError(field, `Максимальне значення: ${field.max}`)
+      return false
+    }
+    if (validity.patternMismatch) {
+      showFieldError(field, field.getAttribute('data-pattern-message') || 'Невірний формат')
+      return false
+    }
+    if (validity.stepMismatch) {
+      showFieldError(field, `Значення має бути кратним ${field.step}`)
+      return false
+    }
+  }
+
+  // Користувацька валідація
+  for (const [ruleName, ruleConfig] of Object.entries(customRules)) {
+    const rule = ValidationRules[ruleName]
+    if (!rule) continue
+
+    const isValid = typeof ruleConfig === 'function'
+      ? ruleConfig(value, field)
+      : Array.isArray(ruleConfig)
+        ? rule(value, ...ruleConfig)
+        : rule(value, ruleConfig)
+
+    if (!isValid) {
+      const message = customRules[`${ruleName}Message`] || `Помилка валідації: ${ruleName}`
+      showFieldError(field, message)
+      return false
+    }
+  }
+
+  // Якщо все ОК, очищаємо помилки
+  clearFieldError(field)
+  field.classList.add('field-valid')
+
+  return true
+}
+
+/**
+ * Валідує всю форму
+ */
+function validateForm(form, fieldRules = {}) {
+  let isValid = true
+
+  // Отримуємо всі поля форми
+  const fields = form.querySelectorAll('input, textarea, select')
+
+  fields.forEach(field => {
+    // Пропускаємо disabled поля
+    if (field.disabled) return
+
+    // Валідуємо поле
+    const fieldId = field.id || field.name
+    const customRules = fieldRules[fieldId] || {}
+
+    if (!validateField(field, customRules)) {
+      isValid = false
+    }
+  })
+
+  return isValid
+}
+
+/**
+ * Додає real-time валідацію до поля
+ */
+function addFieldValidation(field, customRules = {}, validateOnInput = true) {
+  // Валідація при втраті фокусу
+  field.addEventListener('blur', () => {
+    validateField(field, customRules)
+  })
+
+  // Валідація під час введення (опціонально)
+  if (validateOnInput) {
+    field.addEventListener('input', debounce(() => {
+      // Очищаємо помилки під час введення
+      if (field.classList.contains('field-error')) {
+        validateField(field, customRules)
+      }
+    }, 300))
+  }
+
+  // Очищаємо візуальні індикатори при фокусі
+  field.addEventListener('focus', () => {
+    field.classList.remove('field-valid')
+  })
+}
+
+// =========================================
 // Фільтрація та сортування (Модуль 3)
 // =========================================
 
@@ -454,6 +645,9 @@ function navigateTo(pageName) {
       break
     case 'progress':
       renderProgress()
+      break
+    case 'profile':
+      renderProfile()
       break
   }
 }
@@ -857,10 +1051,71 @@ function showCreateCourseForm() {
   // Збираємо форму
   appendChildren(form, titleGroup, instructorGroup, durationGroup, descGroup, iconGroup, buttonsDiv)
 
-  // Обробник відправки форми
+  // Обробник відправки форми з валідацією
   form.addEventListener('submit', (e) => {
     e.preventDefault()
-    createCourse(form)
+
+    // Валідація форми (Модуль 5)
+    const isValid = validateForm(form, {
+      'course-title': {
+        minLength: 5,
+        minLengthMessage: 'Назва курсу має містити мінімум 5 символів',
+        maxLength: 100,
+        maxLengthMessage: 'Назва курсу занадто довга (макс. 100 символів)'
+      },
+      'course-instructor': {
+        minLength: 3,
+        minLengthMessage: 'Ім\'я викладача має містити мінімум 3 символи'
+      },
+      'course-duration': {
+        pattern: /\d+\s*(год|хв|год\.|хвилин|годин|hours?|minutes?)/i,
+        patternMessage: 'Вкажіть тривалість у форматі "10 годин" або "45 хв"'
+      },
+      'course-description': {
+        minLength: 20,
+        minLengthMessage: 'Опис курсу має містити мінімум 20 символів',
+        maxLength: 500,
+        maxLengthMessage: 'Опис курсу занадто довгий (макс. 500 символів)'
+      }
+    })
+
+    if (isValid) {
+      createCourse(form)
+    } else {
+      showNotification('Будь ласка, виправте помилки у формі', 'error')
+    }
+  })
+
+  // Додаємо real-time валідацію (Модуль 5)
+  const titleInput = form.querySelector('#course-title')
+  const instructorInput = form.querySelector('#course-instructor')
+  const durationInput = form.querySelector('#course-duration')
+
+  titleInput.setAttribute('data-label', 'Назва курсу')
+  instructorInput.setAttribute('data-label', 'Викладач')
+  durationInput.setAttribute('data-label', 'Тривалість')
+  descTextarea.setAttribute('data-label', 'Опис курсу')
+
+  addFieldValidation(titleInput, {
+    minLength: 5,
+    minLengthMessage: 'Назва курсу має містити мінімум 5 символів',
+    maxLength: 100
+  })
+
+  addFieldValidation(instructorInput, {
+    minLength: 3,
+    minLengthMessage: 'Ім\'я викладача має містити мінімум 3 символи'
+  })
+
+  addFieldValidation(durationInput, {
+    pattern: /\d+\s*(год|хв|год\.|хвилин|годин|hours?|minutes?)/i,
+    patternMessage: 'Вкажіть тривалість у форматі "10 годин" або "45 хв"'
+  })
+
+  addFieldValidation(descTextarea, {
+    minLength: 20,
+    minLengthMessage: 'Опис курсу має містити мінімум 20 символів',
+    maxLength: 500
   })
 
   // Збираємо контейнер
@@ -1546,6 +1801,306 @@ function renderProgress() {
 }
 
 // =========================================
+// Рендеринг профілю (Модуль 5)
+// =========================================
+function renderProfile() {
+  const profileContent = document.getElementById('profile-content')
+  if (!profileContent) return
+
+  profileContent.innerHTML = ''
+
+  // Контейнер форми
+  const formContainer = createElement('div', [])
+  formContainer.style.cssText = 'max-width: 600px; margin: 0 auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: var(--shadow);'
+
+  // Заголовок
+  const formTitle = createElement('h3')
+  setText(formTitle, '✏️ Редагувати профіль')
+  formTitle.style.cssText = 'color: var(--primary-color); margin-bottom: 1.5rem;'
+
+  // Форма
+  const form = createElement('form', [], { id: 'profile-form', novalidate: 'true' })
+
+  // Секція: Особиста інформація
+  const personalSection = createElement('div', [])
+  personalSection.style.marginBottom = '2rem'
+
+  const personalTitle = createElement('h4')
+  setText(personalTitle, '👤 Особиста інформація')
+  personalTitle.style.cssText = 'color: var(--text-color); margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;'
+
+  // Поле: Ім'я (text, required, minlength)
+  const nameGroup = createElement('div', [])
+  nameGroup.style.marginBottom = '1rem'
+  const nameLabel = createElement('label', [], { for: 'profile-name' })
+  setText(nameLabel, 'Повне ім\'я *')
+  nameLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+  const nameInput = createElement('input', [], {
+    type: 'text',
+    id: 'profile-name',
+    placeholder: 'Іван Петренко',
+    required: 'true',
+    minlength: '3',
+    'data-label': 'Ім\'я'
+  })
+  nameInput.style.cssText = 'width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; transition: border-color 0.3s;'
+  appendChildren(nameGroup, nameLabel, nameInput)
+
+  // Поле: Email (email, required)
+  const emailGroup = createElement('div', [])
+  emailGroup.style.marginBottom = '1rem'
+  const emailLabel = createElement('label', [], { for: 'profile-email' })
+  setText(emailLabel, 'Email *')
+  emailLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+  const emailInput = createElement('input', [], {
+    type: 'email',
+    id: 'profile-email',
+    placeholder: 'ivan@example.com',
+    required: 'true',
+    'data-label': 'Email'
+  })
+  emailInput.style.cssText = 'width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; transition: border-color 0.3s;'
+  appendChildren(emailGroup, emailLabel, emailInput)
+
+  // Поле: Телефон (tel, pattern)
+  const phoneGroup = createElement('div', [])
+  phoneGroup.style.marginBottom = '1rem'
+  const phoneLabel = createElement('label', [], { for: 'profile-phone' })
+  setText(phoneLabel, 'Телефон')
+  phoneLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+  const phoneInput = createElement('input', [], {
+    type: 'tel',
+    id: 'profile-phone',
+    placeholder: '+380 (XX) XXX-XX-XX',
+    pattern: '\\+?[0-9\\s\\(\\)\\-]{10,}',
+    'data-label': 'Телефон',
+    'data-pattern-message': 'Введіть коректний номер телефону'
+  })
+  phoneInput.style.cssText = 'width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; transition: border-color 0.3s;'
+  appendChildren(phoneGroup, phoneLabel, phoneInput)
+
+  // Поле: Дата народження (date, max)
+  const birthdateGroup = createElement('div', [])
+  birthdateGroup.style.marginBottom = '1rem'
+  const birthdateLabel = createElement('label', [], { for: 'profile-birthdate' })
+  setText(birthdateLabel, 'Дата народження')
+  birthdateLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+  const birthdateInput = createElement('input', [], {
+    type: 'date',
+    id: 'profile-birthdate',
+    max: new Date().toISOString().split('T')[0], // Не може бути в майбутньому
+    'data-label': 'Дата народження'
+  })
+  birthdateInput.style.cssText = 'width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; transition: border-color 0.3s;'
+  appendChildren(birthdateGroup, birthdateLabel, birthdateInput)
+
+  appendChildren(personalSection, personalTitle, nameGroup, emailGroup, phoneGroup, birthdateGroup)
+
+  // Секція: Навчальні налаштування
+  const studySection = createElement('div', [])
+  studySection.style.marginBottom = '2rem'
+
+  const studyTitle = createElement('h4')
+  setText(studyTitle, '🎓 Навчальні налаштування')
+  studyTitle.style.cssText = 'color: var(--text-color); margin-bottom: 1rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem;'
+
+  // Поле: Рівень (select, required)
+  const levelGroup = createElement('div', [])
+  levelGroup.style.marginBottom = '1rem'
+  const levelLabel = createElement('label', [], { for: 'profile-level' })
+  setText(levelLabel, 'Рівень підготовки *')
+  levelLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+  const levelSelect = createElement('select', [], {
+    id: 'profile-level',
+    required: 'true',
+    'data-label': 'Рівень підготовки'
+  })
+  levelSelect.style.cssText = 'width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; transition: border-color 0.3s;'
+
+  const levels = ['', 'Початківець', 'Середній', 'Досвідчений', 'Експерт']
+  levels.forEach(level => {
+    const option = createElement('option', [], { value: level.toLowerCase() })
+    setText(option, level || '-- Оберіть рівень --')
+    if (level === '') option.disabled = true
+    levelSelect.appendChild(option)
+  })
+  appendChildren(levelGroup, levelLabel, levelSelect)
+
+  // Поле: Годин навчання на тиждень (number, min, max)
+  const hoursGroup = createElement('div', [])
+  hoursGroup.style.marginBottom = '1rem'
+  const hoursLabel = createElement('label', [], { for: 'profile-hours' })
+  setText(hoursLabel, 'Годин навчання на тиждень')
+  hoursLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+  const hoursInput = createElement('input', [], {
+    type: 'number',
+    id: 'profile-hours',
+    min: '1',
+    max: '168',
+    step: '1',
+    placeholder: '10',
+    'data-label': 'Годин на тиждень'
+  })
+  hoursInput.style.cssText = 'width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; transition: border-color 0.3s;'
+  appendChildren(hoursGroup, hoursLabel, hoursInput)
+
+  // Поле: Мотивація (range + display)
+  const motivationGroup = createElement('div', [])
+  motivationGroup.style.marginBottom = '1rem'
+  const motivationLabel = createElement('label', [], { for: 'profile-motivation' })
+  setText(motivationLabel, 'Рівень мотивації')
+  motivationLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+
+  const motivationDisplay = createElement('span', [])
+  setText(motivationDisplay, '50%')
+  motivationDisplay.style.cssText = 'float: right; color: var(--primary-color); font-weight: 700;'
+
+  const motivationInput = createElement('input', [], {
+    type: 'range',
+    id: 'profile-motivation',
+    min: '0',
+    max: '100',
+    value: '50',
+    step: '10',
+    'data-label': 'Мотивація'
+  })
+  motivationInput.style.cssText = 'width: 100%; margin-top: 0.5rem;'
+
+  // Update display on range change
+  motivationInput.addEventListener('input', (e) => {
+    setText(motivationDisplay, `${e.target.value}%`)
+  })
+
+  const motivationLabelContainer = createElement('div', [])
+  motivationLabelContainer.style.display = 'flex'
+  motivationLabelContainer.style.justifyContent = 'space-between'
+  appendChildren(motivationLabelContainer, motivationLabel, motivationDisplay)
+
+  appendChildren(motivationGroup, motivationLabelContainer, motivationInput)
+
+  // Поле: URL особистого сайту (url)
+  const websiteGroup = createElement('div', [])
+  websiteGroup.style.marginBottom = '1rem'
+  const websiteLabel = createElement('label', [], { for: 'profile-website' })
+  setText(websiteLabel, 'Особистий сайт/портфоліо')
+  websiteLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+  const websiteInput = createElement('input', [], {
+    type: 'url',
+    id: 'profile-website',
+    placeholder: 'https://myportfolio.com',
+    'data-label': 'Веб-сайт'
+  })
+  websiteInput.style.cssText = 'width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; transition: border-color 0.3s;'
+  appendChildren(websiteGroup, websiteLabel, websiteInput)
+
+  // Поле: Сповіщення (checkbox)
+  const notificationsGroup = createElement('div', [])
+  notificationsGroup.style.marginBottom = '1rem'
+  const notificationsLabel = createElement('label', [])
+  notificationsLabel.style.cssText = 'display: flex; align-items: center; cursor: pointer;'
+
+  const notificationsCheckbox = createElement('input', [], {
+    type: 'checkbox',
+    id: 'profile-notifications',
+    checked: 'true'
+  })
+  notificationsCheckbox.style.cssText = 'width: 20px; height: 20px; margin-right: 0.5rem; cursor: pointer;'
+
+  const notificationsText = createElement('span', [])
+  setText(notificationsText, 'Отримувати email сповіщення про нові курси')
+
+  appendChildren(notificationsLabel, notificationsCheckbox, notificationsText)
+  appendChildren(notificationsGroup, notificationsLabel)
+
+  appendChildren(studySection, studyTitle, levelGroup, hoursGroup, motivationGroup, websiteGroup, notificationsGroup)
+
+  // Кнопки
+  const buttonsDiv = createElement('div', [])
+  buttonsDiv.style.cssText = 'display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; padding-top: 1.5rem; border-top: 2px solid var(--border-color);'
+
+  const resetBtn = createElement('button', ['btn', 'btn-secondary'], { type: 'reset' })
+  setText(resetBtn, 'Скинути')
+
+  const submitBtn = createElement('button', ['btn', 'btn-primary'], { type: 'submit' })
+  setText(submitBtn, '💾 Зберегти профіль')
+
+  appendChildren(buttonsDiv, resetBtn, submitBtn)
+
+  // Збираємо форму
+  appendChildren(form, personalSection, studySection, buttonsDiv)
+
+  // Обробник відправки форми з валідацією
+  form.addEventListener('submit', (e) => {
+    e.preventDefault()
+
+    // Валідація форми (Модуль 5)
+    const isValid = validateForm(form, {
+      'profile-name': {
+        minLength: 3,
+        minLengthMessage: 'Ім\'я має містити мінімум 3 символи'
+      },
+      'profile-hours': {
+        min: 1,
+        max: 168,
+        minMessage: 'Мінімум 1 година на тиждень',
+        maxMessage: 'Максимум 168 годин на тиждень'
+      }
+    })
+
+    if (isValid) {
+      const formData = {
+        name: nameInput.value,
+        email: emailInput.value,
+        phone: phoneInput.value,
+        birthdate: birthdateInput.value,
+        level: levelSelect.value,
+        hours: hoursInput.value,
+        motivation: motivationInput.value,
+        website: websiteInput.value,
+        notifications: notificationsCheckbox.checked
+      }
+
+      console.log('📝 Модуль 5: Дані профілю', formData)
+      showNotification('Профіль успішно збережено! 🎉', 'success')
+
+      // Демонстрація використання FormData API
+      const formDataAPI = new FormData(form)
+      console.log('📋 FormData entries:')
+      for (const [key, value] of formDataAPI.entries()) {
+        console.log(`${key}: ${value}`)
+      }
+    } else {
+      showNotification('Будь ласка, виправте помилки у формі', 'error')
+    }
+  })
+
+  // Real-time валідація (Модуль 5)
+  addFieldValidation(nameInput, {
+    minLength: 3,
+    minLengthMessage: 'Ім\'я має містити мінімум 3 символи'
+  })
+
+  addFieldValidation(emailInput, {})
+
+  addFieldValidation(phoneInput, {}, false) // Валідація тільки на blur
+
+  addFieldValidation(websiteInput, {}, false)
+
+  addFieldValidation(hoursInput, {
+    min: 1,
+    max: 168,
+    minMessage: 'Мінімум 1 година',
+    maxMessage: 'Максимум 168 годин'
+  })
+
+  // Збираємо контейнер
+  appendChildren(formContainer, formTitle, form)
+  profileContent.appendChild(formContainer)
+
+  console.log('📝 Модуль 5: Форма профілю з валідацією створена')
+}
+
+// =========================================
 // Показати сповіщення
 // =========================================
 function showNotification(message, type = 'success') {
@@ -1627,15 +2182,15 @@ function initApp() {
       }
     }
 
-    // Цифри 1-3 - швидка навігація по сторінках
-    if (e.key >= '1' && e.key <= '3' && !e.ctrlKey && !e.metaKey) {
+    // Цифри 1-4 - швидка навігація по сторінках
+    if (e.key >= '1' && e.key <= '4' && !e.ctrlKey && !e.metaKey) {
       const target = e.target
       // Не спрацьовує, якщо ми в полі вводу
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
         return
       }
 
-      const pages = ['courses', 'my-courses', 'progress']
+      const pages = ['courses', 'my-courses', 'progress', 'profile']
       const pageIndex = parseInt(e.key) - 1
       if (pages[pageIndex]) {
         navigateTo(pages[pageIndex])
