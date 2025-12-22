@@ -168,7 +168,11 @@ let appState = {
   selectedCourseId: null,
   currentTestId: null,
   userAnswers: [],
-  nextCourseId: 7 // Для генерації ID нових курсів
+  nextCourseId: 7, // Для генерації ID нових курсів
+  // Модуль 3: Стан фільтрів та сортування
+  searchQuery: '',
+  filterEnrolled: 'all', // 'all', 'enrolled', 'available'
+  sortBy: 'default' // 'default', 'title', 'duration'
 }
 
 // =========================================
@@ -212,6 +216,74 @@ function appendChildren(parent, ...children) {
     }
   })
   return parent
+}
+
+// =========================================
+// Event Handler Utilities (Модуль 3)
+// =========================================
+
+/**
+ * Debounce - затримка виконання функції до завершення серії викликів
+ */
+function debounce(func, delay = 300) {
+  let timeoutId
+  return function (...args) {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => func.apply(this, args), delay)
+  }
+}
+
+/**
+ * Створення та диспетчеризація власних подій
+ */
+function dispatchCustomEvent(eventName, detail = {}) {
+  const event = new CustomEvent(eventName, {
+    detail,
+    bubbles: true,
+    cancelable: true
+  })
+  document.dispatchEvent(event)
+}
+
+// =========================================
+// Фільтрація та сортування (Модуль 3)
+// =========================================
+
+/**
+ * Фільтрація курсів за пошуковим запитом та статусом
+ */
+function getFilteredCourses() {
+  let filtered = [...coursesData]
+
+  // Фільтр за пошуком (input event)
+  if (appState.searchQuery) {
+    const query = appState.searchQuery.toLowerCase()
+    filtered = filtered.filter(course =>
+      course.title.toLowerCase().includes(query) ||
+      course.instructor.toLowerCase().includes(query) ||
+      course.description.toLowerCase().includes(query)
+    )
+  }
+
+  // Фільтр за статусом (change event)
+  if (appState.filterEnrolled === 'enrolled') {
+    filtered = filtered.filter(c => c.enrolled)
+  } else if (appState.filterEnrolled === 'available') {
+    filtered = filtered.filter(c => !c.enrolled)
+  }
+
+  // Сортування (click event)
+  if (appState.sortBy === 'title') {
+    filtered.sort((a, b) => a.title.localeCompare(b.title))
+  } else if (appState.sortBy === 'duration') {
+    filtered.sort((a, b) => {
+      const durationA = parseInt(a.duration) || 0
+      const durationB = parseInt(b.duration) || 0
+      return durationB - durationA
+    })
+  }
+
+  return filtered
 }
 
 // =========================================
@@ -355,7 +427,144 @@ function createCourseCard(course) {
 }
 
 // =========================================
-// Рендеринг списку курсів (оновлено для Модуля 2)
+// Створення панелі пошуку та фільтрів (Модуль 3)
+// =========================================
+function createSearchAndFilters() {
+  // Контейнер для всіх контролів
+  const controlsDiv = createElement('div', [])
+  controlsDiv.id = 'courses-controls'
+  controlsDiv.style.cssText = 'background: white; padding: 1.5rem; border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 2rem;'
+
+  // Верхній ряд: Кнопка створення та пошук
+  const topRow = createElement('div', [])
+  topRow.style.cssText = 'display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;'
+
+  // Кнопка створення курсу
+  const addCourseBtn = createElement('button', ['btn', 'btn-primary'])
+  addCourseBtn.id = 'add-course-btn'
+  setText(addCourseBtn, '➕ Створити курс')
+  addCourseBtn.addEventListener('click', (e) => {
+    e.preventDefault() // Модуль 3: preventDefault
+    showCreateCourseForm()
+  })
+
+  // Поле пошуку (input event + debounce)
+  const searchInput = createElement('input', [])
+  searchInput.type = 'text'
+  searchInput.placeholder = '🔍 Пошук курсів...'
+  searchInput.id = 'search-input'
+  searchInput.style.cssText = 'flex: 1; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; min-width: 250px;'
+  searchInput.value = appState.searchQuery
+
+  // Обробник input події з debounce
+  const handleSearch = debounce((e) => {
+    appState.searchQuery = e.target.value
+    renderCourses()
+    dispatchCustomEvent('coursesFiltered', { query: appState.searchQuery })
+  }, 300)
+
+  searchInput.addEventListener('input', handleSearch)
+
+  // Обробник keypress події (Enter для швидкого пошуку)
+  searchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      appState.searchQuery = e.target.value
+      renderCourses()
+    }
+  })
+
+  appendChildren(topRow, addCourseBtn, searchInput)
+
+  // Нижній ряд: Фільтри та сортування
+  const bottomRow = createElement('div', [])
+  bottomRow.style.cssText = 'display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;'
+
+  // Фільтр за статусом (change event)
+  const filterLabel = createElement('label', [])
+  filterLabel.style.cssText = 'font-weight: 600; color: var(--text-color);'
+  setText(filterLabel, 'Фільтр:')
+
+  const filterSelect = createElement('select', [])
+  filterSelect.id = 'filter-select'
+  filterSelect.style.cssText = 'padding: 0.5rem; border: 2px solid var(--border-color); border-radius: 8px; cursor: pointer;'
+
+  const filterOptions = [
+    { value: 'all', text: 'Всі курси' },
+    { value: 'enrolled', text: 'Мої курси' },
+    { value: 'available', text: 'Доступні' }
+  ]
+
+  filterOptions.forEach(opt => {
+    const option = createElement('option', [])
+    option.value = opt.value
+    setText(option, opt.text)
+    if (opt.value === appState.filterEnrolled) {
+      option.selected = true
+    }
+    filterSelect.appendChild(option)
+  })
+
+  // Обробник change події
+  filterSelect.addEventListener('change', (e) => {
+    appState.filterEnrolled = e.target.value
+    renderCourses()
+    dispatchCustomEvent('coursesFiltered', { filter: appState.filterEnrolled })
+  })
+
+  // Сортування (click events)
+  const sortLabel = createElement('label', [])
+  sortLabel.style.cssText = 'font-weight: 600; color: var(--text-color); margin-left: 1rem;'
+  setText(sortLabel, 'Сортування:')
+
+  const sortSelect = createElement('select', [])
+  sortSelect.id = 'sort-select'
+  sortSelect.style.cssText = 'padding: 0.5rem; border: 2px solid var(--border-color); border-radius: 8px; cursor: pointer;'
+
+  const sortOptions = [
+    { value: 'default', text: 'За замовчуванням' },
+    { value: 'title', text: 'За назвою' },
+    { value: 'duration', text: 'За тривалістю' }
+  ]
+
+  sortOptions.forEach(opt => {
+    const option = createElement('option', [])
+    option.value = opt.value
+    setText(option, opt.text)
+    if (opt.value === appState.sortBy) {
+      option.selected = true
+    }
+    sortSelect.appendChild(option)
+  })
+
+  // Обробник change події для сортування
+  sortSelect.addEventListener('change', (e) => {
+    appState.sortBy = e.target.value
+    renderCourses()
+    dispatchCustomEvent('coursesSorted', { sortBy: appState.sortBy })
+  })
+
+  // Кнопка скидання фільтрів (click event)
+  const resetBtn = createElement('button', ['btn', 'btn-secondary'])
+  resetBtn.style.cssText = 'padding: 0.5rem 1rem; margin-left: auto;'
+  setText(resetBtn, '🔄 Скинути')
+  resetBtn.addEventListener('click', (e) => {
+    e.preventDefault()
+    appState.searchQuery = ''
+    appState.filterEnrolled = 'all'
+    appState.sortBy = 'default'
+    renderCourses()
+    dispatchCustomEvent('filtersReset', {})
+  })
+
+  appendChildren(bottomRow, filterLabel, filterSelect, sortLabel, sortSelect, resetBtn)
+  appendChildren(controlsDiv, topRow, bottomRow)
+
+  return controlsDiv
+}
+
+// =========================================
+// Рендеринг списку курсів (оновлено для Модуля 3)
 // =========================================
 function renderCourses() {
   const coursesList = document.getElementById('courses-list')
@@ -364,27 +573,69 @@ function renderCourses() {
   // Очищаємо контейнер
   coursesList.innerHTML = ''
 
-  // Створюємо кнопку "Додати курс" через DOM API
-  const addCourseBtn = createElement('button', ['btn', 'btn-primary'])
-  addCourseBtn.id = 'add-course-btn'
-  setText(addCourseBtn, '➕ Створити власний курс')
-  addCourseBtn.style.marginBottom = '2rem'
-  addCourseBtn.style.padding = '1rem 2rem'
+  // Видаляємо попередню панель контролів, якщо є
+  const oldControls = document.getElementById('courses-controls')
+  if (oldControls) {
+    oldControls.remove()
+  }
 
-  addCourseBtn.addEventListener('click', showCreateCourseForm)
-
-  // Додаємо кнопку перед сіткою курсів
+  // Додаємо панель пошуку та фільтрів
   const container = coursesList.parentElement
   const heading = container.querySelector('h2')
+  const controlsPanel = createSearchAndFilters()
+
   if (heading && heading.nextSibling) {
-    container.insertBefore(addCourseBtn, heading.nextSibling)
+    container.insertBefore(controlsPanel, heading.nextSibling)
+  }
+
+  // Отримуємо відфільтровані та відсортовані курси
+  const filteredCourses = getFilteredCourses()
+
+  // Якщо немає результатів
+  if (filteredCourses.length === 0) {
+    const emptyDiv = createElement('div', [])
+    emptyDiv.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 3rem; background: white; border-radius: 12px;'
+
+    const emptyIcon = createElement('div', [])
+    emptyIcon.style.cssText = 'font-size: 4rem; margin-bottom: 1rem;'
+    setText(emptyIcon, '🔍')
+
+    const emptyText = createElement('p', [])
+    emptyText.style.cssText = 'font-size: 1.2rem; color: #6b7280;'
+    setText(emptyText, 'Курсів не знайдено. Спробуйте змінити параметри пошуку.')
+
+    appendChildren(emptyDiv, emptyIcon, emptyText)
+    coursesList.appendChild(emptyDiv)
+    return
   }
 
   // Створюємо та додаємо картки курсів через DOM API
-  coursesData.forEach(course => {
+  filteredCourses.forEach(course => {
     const card = createCourseCard(course)
     coursesList.appendChild(card)
   })
+
+  // Показуємо кількість результатів
+  updateResultsCount(filteredCourses.length)
+}
+
+// =========================================
+// Оновлення лічильника результатів (Модуль 3)
+// =========================================
+function updateResultsCount(count) {
+  const container = document.getElementById('courses-list').parentElement
+  let countDiv = document.getElementById('results-count')
+
+  if (!countDiv) {
+    countDiv = createElement('div', [])
+    countDiv.id = 'results-count'
+    countDiv.style.cssText = 'margin-bottom: 1rem; color: #6b7280; font-weight: 600;'
+
+    const coursesList = document.getElementById('courses-list')
+    container.insertBefore(countDiv, coursesList)
+  }
+
+  setText(countDiv, `📚 Знайдено курсів: ${count}`)
 }
 
 // =========================================
@@ -1072,11 +1323,95 @@ function initApp() {
     })
   }
 
+  // =========================================
+  // Модуль 3: Клавіатурна навігація та події
+  // =========================================
+
+  // Глобальна клавіатурна навігація (keydown event)
+  document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + K - фокус на пошук
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault()
+      const searchInput = document.getElementById('search-input')
+      if (searchInput) {
+        searchInput.focus()
+        searchInput.select()
+      }
+    }
+
+    // Escape - скинути пошук або закрити форму
+    if (e.key === 'Escape') {
+      const formContainer = document.getElementById('create-course-form-container')
+      if (formContainer) {
+        formContainer.remove()
+      } else {
+        const searchInput = document.getElementById('search-input')
+        if (searchInput && searchInput.value) {
+          searchInput.value = ''
+          appState.searchQuery = ''
+          renderCourses()
+        }
+      }
+    }
+
+    // Цифри 1-3 - швидка навігація по сторінках
+    if (e.key >= '1' && e.key <= '3' && !e.ctrlKey && !e.metaKey) {
+      const target = e.target
+      // Не спрацьовує, якщо ми в полі вводу
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return
+      }
+
+      const pages = ['courses', 'my-courses', 'progress']
+      const pageIndex = parseInt(e.key) - 1
+      if (pages[pageIndex]) {
+        navigateTo(pages[pageIndex])
+      }
+    }
+  })
+
+  // Слухачі власних подій (CustomEvent)
+  document.addEventListener('coursesFiltered', (e) => {
+    console.log('🔍 Курси відфільтровано:', e.detail)
+  })
+
+  document.addEventListener('coursesSorted', (e) => {
+    console.log('🔄 Курси відсортовано:', e.detail)
+  })
+
+  document.addEventListener('filtersReset', () => {
+    console.log('♻️ Фільтри скинуто')
+  })
+
+  // Делегування подій для динамічних елементів (mouseover/mouseout)
+  const app = document.getElementById('app')
+  app.addEventListener('mouseover', (e) => {
+    // Якщо це картка курсу
+    if (e.target.closest('.course-card')) {
+      const card = e.target.closest('.course-card')
+      // Додаємо ефект підсвічування
+      card.style.borderLeft = '4px solid var(--primary-color)'
+    }
+  })
+
+  app.addEventListener('mouseout', (e) => {
+    // Якщо це картка курсу
+    if (e.target.closest('.course-card')) {
+      const card = e.target.closest('.course-card')
+      // Прибираємо ефект
+      card.style.borderLeft = 'none'
+    }
+  })
+
   // Початкова сторінка - курси
   renderCourses()
 
   console.log('✅ E-learning Platform ініціалізовано')
   console.log('📚 Доступно курсів:', coursesData.length)
+  console.log('⌨️ Клавіатурні скорочення:')
+  console.log('  • Ctrl/Cmd + K - Фокус на пошук')
+  console.log('  • Escape - Скинути пошук або закрити форму')
+  console.log('  • 1-3 - Перехід між сторінками')
 }
 
 // Запускаємо додаток після завантаження DOM
