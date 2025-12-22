@@ -167,7 +167,51 @@ let appState = {
   currentPage: 'courses',
   selectedCourseId: null,
   currentTestId: null,
-  userAnswers: []
+  userAnswers: [],
+  nextCourseId: 7 // Для генерації ID нових курсів
+}
+
+// =========================================
+// DOM Helper Functions (Модуль 2)
+// =========================================
+
+/**
+ * Створює DOM елемент з класами та атрибутами
+ */
+function createElement(tag, classes = [], attributes = {}) {
+  const element = document.createElement(tag)
+
+  // Додаємо класи через classList
+  if (classes.length > 0) {
+    element.classList.add(...classes)
+  }
+
+  // Додаємо атрибути через setAttribute
+  Object.keys(attributes).forEach(key => {
+    element.setAttribute(key, attributes[key])
+  })
+
+  return element
+}
+
+/**
+ * Створює текстовий вузол або додає textContent
+ */
+function setText(element, text) {
+  element.textContent = text
+  return element
+}
+
+/**
+ * Додає дочірні елементи до батьківського
+ */
+function appendChildren(parent, ...children) {
+  children.forEach(child => {
+    if (child) {
+      parent.appendChild(child)
+    }
+  })
+  return parent
 }
 
 // =========================================
@@ -212,63 +256,134 @@ function navigateTo(pageName) {
 }
 
 // =========================================
-// Рендеринг списку курсів
+// Створення картки курсу через DOM API (Модуль 2)
+// =========================================
+function createCourseCard(course) {
+  // Основний контейнер картки
+  const card = createElement('div', ['course-card'], { 'data-course-id': course.id })
+
+  // Зображення курсу
+  const imageDiv = createElement('div', ['course-card-image'])
+  setText(imageDiv, course.icon)
+
+  // Контент картки
+  const contentDiv = createElement('div', ['course-card-content'])
+
+  // Заголовок
+  const title = createElement('h3')
+  setText(title, course.title)
+
+  // Мета-інформація
+  const metaDiv = createElement('div', ['course-card-meta'])
+  const instructorSpan = createElement('span')
+  setText(instructorSpan, `👨‍🏫 ${course.instructor}`)
+  const durationSpan = createElement('span')
+  setText(durationSpan, `⏱️ ${course.duration}`)
+  appendChildren(metaDiv, instructorSpan, durationSpan)
+
+  // Опис
+  const description = createElement('p')
+  setText(description, course.description)
+
+  // Footer
+  const footer = createElement('div', ['course-card-footer'])
+
+  // Прогрес або порожній span
+  let progressSpan
+  if (course.enrolled) {
+    progressSpan = createElement('span', ['course-progress'])
+    setText(progressSpan, `${course.progress}% завершено`)
+  } else {
+    progressSpan = createElement('span')
+  }
+
+  // Кнопка
+  const button = createElement('button', ['btn', 'btn-primary'])
+  button.setAttribute('data-course-id', course.id)
+
+  if (course.enrolled) {
+    button.classList.add('btn-continue')
+    setText(button, 'Продовжити')
+  } else {
+    button.classList.add('btn-enroll')
+    setText(button, 'Записатись')
+  }
+
+  // Кнопка видалення для користувацьких курсів
+  if (course.isCustom) {
+    const deleteBtn = createElement('button', ['btn', 'btn-secondary'])
+    deleteBtn.setAttribute('data-course-id', course.id)
+    deleteBtn.classList.add('btn-delete')
+    setText(deleteBtn, '🗑️ Видалити')
+    deleteBtn.style.marginLeft = '0.5rem'
+    appendChildren(footer, progressSpan, button, deleteBtn)
+  } else {
+    appendChildren(footer, progressSpan, button)
+  }
+
+  // Збираємо всі елементи разом
+  appendChildren(contentDiv, title, metaDiv, description, footer)
+  appendChildren(card, imageDiv, contentDiv)
+
+  // Додаємо обробники подій
+  card.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('btn')) {
+      showCourseDetail(course.id)
+    }
+  })
+
+  // Обробник для кнопки запису/продовження
+  button.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (course.enrolled) {
+      showCourseDetail(course.id)
+    } else {
+      enrollCourse(course.id)
+    }
+  })
+
+  // Обробник для кнопки видалення
+  if (course.isCustom) {
+    const deleteBtn = footer.querySelector('.btn-delete')
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      deleteCourse(course.id)
+    })
+  }
+
+  return card
+}
+
+// =========================================
+// Рендеринг списку курсів (оновлено для Модуля 2)
 // =========================================
 function renderCourses() {
   const coursesList = document.getElementById('courses-list')
-
   if (!coursesList) return
 
-  coursesList.innerHTML = coursesData.map(course => `
-    <div class="course-card" data-course-id="${course.id}">
-      <div class="course-card-image">
-        ${course.icon}
-      </div>
-      <div class="course-card-content">
-        <h3>${course.title}</h3>
-        <div class="course-card-meta">
-          <span>👨‍🏫 ${course.instructor}</span>
-          <span>⏱️ ${course.duration}</span>
-        </div>
-        <p>${course.description}</p>
-        <div class="course-card-footer">
-          ${course.enrolled
-            ? `<span class="course-progress">${course.progress}% завершено</span>`
-            : '<span></span>'
-          }
-          <button class="btn btn-primary ${course.enrolled ? 'btn-continue' : 'btn-enroll'}"
-                  data-course-id="${course.id}">
-            ${course.enrolled ? 'Продовжити' : 'Записатись'}
-          </button>
-        </div>
-      </div>
-    </div>
-  `).join('')
+  // Очищаємо контейнер
+  coursesList.innerHTML = ''
 
-  // Додаємо обробники подій
-  coursesList.querySelectorAll('.course-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      if (!e.target.classList.contains('btn')) {
-        const courseId = parseInt(card.dataset.courseId)
-        showCourseDetail(courseId)
-      }
-    })
-  })
+  // Створюємо кнопку "Додати курс" через DOM API
+  const addCourseBtn = createElement('button', ['btn', 'btn-primary'])
+  addCourseBtn.id = 'add-course-btn'
+  setText(addCourseBtn, '➕ Створити власний курс')
+  addCourseBtn.style.marginBottom = '2rem'
+  addCourseBtn.style.padding = '1rem 2rem'
 
-  coursesList.querySelectorAll('.btn-enroll').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      const courseId = parseInt(btn.dataset.courseId)
-      enrollCourse(courseId)
-    })
-  })
+  addCourseBtn.addEventListener('click', showCreateCourseForm)
 
-  coursesList.querySelectorAll('.btn-continue').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      const courseId = parseInt(btn.dataset.courseId)
-      showCourseDetail(courseId)
-    })
+  // Додаємо кнопку перед сіткою курсів
+  const container = coursesList.parentElement
+  const heading = container.querySelector('h2')
+  if (heading && heading.nextSibling) {
+    container.insertBefore(addCourseBtn, heading.nextSibling)
+  }
+
+  // Створюємо та додаємо картки курсів через DOM API
+  coursesData.forEach(course => {
+    const card = createCourseCard(course)
+    coursesList.appendChild(card)
   })
 }
 
@@ -282,6 +397,212 @@ function enrollCourse(courseId) {
     course.enrolled = true
     renderCourses()
     showNotification(`Ви успішно записались на курс "${course.title}"!`, 'success')
+  }
+}
+
+// =========================================
+// Показати форму створення курсу (Модуль 2)
+// =========================================
+function showCreateCourseForm() {
+  const container = document.getElementById('courses-list').parentElement
+
+  // Перевіряємо, чи форма вже існує
+  let formContainer = document.getElementById('create-course-form-container')
+
+  if (formContainer) {
+    // Якщо форма вже є, видаляємо її (toggle)
+    formContainer.remove()
+    return
+  }
+
+  // Створюємо контейнер форми через DOM API
+  formContainer = createElement('div', [], { id: 'create-course-form-container' })
+  formContainer.style.cssText = 'background: white; padding: 2rem; border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 2rem;'
+
+  // Заголовок форми
+  const formTitle = createElement('h3')
+  setText(formTitle, '➕ Створити власний курс')
+  formTitle.style.cssText = 'color: var(--primary-color); margin-bottom: 1.5rem;'
+
+  // Форма
+  const form = createElement('form', [], { id: 'create-course-form' })
+
+  // Поле: Назва курсу
+  const titleGroup = createFormGroup('Назва курсу', 'course-title', 'text', 'Наприклад: Python для Data Science')
+
+  // Поле: Викладач
+  const instructorGroup = createFormGroup('Викладач', 'course-instructor', 'text', 'Ваше ім\'я')
+
+  // Поле: Тривалість
+  const durationGroup = createFormGroup('Тривалість', 'course-duration', 'text', 'Наприклад: 10 годин')
+
+  // Поле: Опис
+  const descGroup = createElement('div', [])
+  descGroup.style.marginBottom = '1rem'
+
+  const descLabel = createElement('label')
+  descLabel.setAttribute('for', 'course-description')
+  setText(descLabel, 'Опис курсу')
+  descLabel.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+
+  const descTextarea = createElement('textarea', [])
+  descTextarea.id = 'course-description'
+  descTextarea.setAttribute('placeholder', 'Короткий опис курсу...')
+  descTextarea.setAttribute('rows', '3')
+  descTextarea.setAttribute('required', 'true')
+  descTextarea.style.cssText = 'width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; font-family: inherit;'
+
+  appendChildren(descGroup, descLabel, descTextarea)
+
+  // Поле: Іконка (емодзі)
+  const iconGroup = createFormGroup('Іконка (емодзі)', 'course-icon', 'text', '📚', false, 'maxlength="2"')
+
+  // Кнопки
+  const buttonsDiv = createElement('div', [])
+  buttonsDiv.style.cssText = 'display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;'
+
+  const cancelBtn = createElement('button', ['btn', 'btn-secondary'])
+  cancelBtn.type = 'button'
+  setText(cancelBtn, 'Скасувати')
+  cancelBtn.addEventListener('click', () => formContainer.remove())
+
+  const submitBtn = createElement('button', ['btn', 'btn-primary'])
+  submitBtn.type = 'submit'
+  setText(submitBtn, '✓ Створити курс')
+
+  appendChildren(buttonsDiv, cancelBtn, submitBtn)
+
+  // Збираємо форму
+  appendChildren(form, titleGroup, instructorGroup, durationGroup, descGroup, iconGroup, buttonsDiv)
+
+  // Обробник відправки форми
+  form.addEventListener('submit', (e) => {
+    e.preventDefault()
+    createCourse(form)
+  })
+
+  // Збираємо контейнер
+  appendChildren(formContainer, formTitle, form)
+
+  // Вставляємо форму після кнопки "Додати курс"
+  const addBtn = document.getElementById('add-course-btn')
+  if (addBtn && addBtn.nextSibling) {
+    container.insertBefore(formContainer, addBtn.nextSibling)
+  }
+}
+
+// =========================================
+// Створення form group (helper)
+// =========================================
+function createFormGroup(labelText, inputId, inputType = 'text', placeholder = '', required = true, extraAttrs = '') {
+  const group = createElement('div', [])
+  group.style.marginBottom = '1rem'
+
+  const label = createElement('label')
+  label.setAttribute('for', inputId)
+  setText(label, labelText)
+  label.style.cssText = 'display: block; margin-bottom: 0.5rem; font-weight: 600;'
+
+  const input = createElement('input', [])
+  input.id = inputId
+  input.type = inputType
+  input.setAttribute('placeholder', placeholder)
+  if (required) input.setAttribute('required', 'true')
+  if (extraAttrs) {
+    extraAttrs.split(' ').forEach(attr => {
+      const [key, value] = attr.split('=')
+      input.setAttribute(key, value.replace(/"/g, ''))
+    })
+  }
+  input.style.cssText = 'width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px;'
+
+  appendChildren(group, label, input)
+  return group
+}
+
+// =========================================
+// Створення нового курсу (Модуль 2)
+// =========================================
+function createCourse(form) {
+  const title = form.querySelector('#course-title').value
+  const instructor = form.querySelector('#course-instructor').value
+  const duration = form.querySelector('#course-duration').value
+  const description = form.querySelector('#course-description').value
+  const icon = form.querySelector('#course-icon').value || '📚'
+
+  // Створюємо новий об'єкт курсу
+  const newCourse = {
+    id: appState.nextCourseId++,
+    title,
+    instructor,
+    duration,
+    description,
+    icon,
+    enrolled: false,
+    progress: 0,
+    isCustom: true, // Позначаємо як користувацький курс
+    lessons: [
+      {
+        id: 1,
+        title: 'Вступний урок',
+        duration: '30 хв',
+        completed: false,
+        videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
+      }
+    ],
+    test: {
+      id: appState.nextCourseId,
+      questions: [
+        {
+          question: 'Чи сподобався вам курс?',
+          options: ['Так', 'Дуже так', 'Неймовірно!', 'Супер!'],
+          correct: 0
+        }
+      ]
+    }
+  }
+
+  // Додаємо курс до масиву
+  coursesData.push(newCourse)
+
+  // Видаляємо форму
+  document.getElementById('create-course-form-container').remove()
+
+  // Перерендерюємо список курсів
+  renderCourses()
+
+  showNotification(`Курс "${title}" успішно створено! 🎉`, 'success')
+}
+
+// =========================================
+// Видалення курсу (Модуль 2)
+// =========================================
+function deleteCourse(courseId) {
+  const course = coursesData.find(c => c.id === courseId)
+
+  if (!course) return
+
+  if (!course.isCustom) {
+    showNotification('Можна видаляти лише власні курси!', 'error')
+    return
+  }
+
+  // Підтвердження видалення
+  if (!confirm(`Ви впевнені, що хочете видалити курс "${course.title}"?`)) {
+    return
+  }
+
+  // Знаходимо індекс курсу
+  const index = coursesData.findIndex(c => c.id === courseId)
+
+  if (index !== -1) {
+    // Видаляємо курс з масиву
+    coursesData.splice(index, 1)
+
+    // Перерендерюємо список
+    renderCourses()
+
+    showNotification(`Курс "${course.title}" видалено`, 'success')
   }
 }
 
@@ -587,69 +908,49 @@ function submitTest(courseId) {
 }
 
 // =========================================
-// Рендеринг моїх курсів
+// Рендеринг моїх курсів (оновлено для Модуля 2)
 // =========================================
 function renderMyCourses() {
   const myCoursesList = document.getElementById('my-courses-list')
 
   if (!myCoursesList) return
 
+  // Очищаємо контейнер
+  myCoursesList.innerHTML = ''
+
   const enrolledCourses = coursesData.filter(c => c.enrolled)
 
   if (enrolledCourses.length === 0) {
-    myCoursesList.innerHTML = `
-      <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
-        <p style="font-size: 1.2rem; color: #6b7280;">
-          Ви ще не записані на жоден курс. Перейдіть до <a href="#" data-page="courses" style="color: var(--primary-color);">каталогу курсів</a>.
-        </p>
-      </div>
-    `
+    // Створюємо повідомлення через DOM API
+    const emptyDiv = createElement('div', [])
+    emptyDiv.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 3rem;'
 
-    myCoursesList.querySelector('a[data-page="courses"]').addEventListener('click', (e) => {
+    const message = createElement('p', [])
+    message.style.cssText = 'font-size: 1.2rem; color: #6b7280;'
+    setText(message, 'Ви ще не записані на жоден курс. Перейдіть до ')
+
+    const link = createElement('a', [])
+    link.href = '#'
+    link.setAttribute('data-page', 'courses')
+    link.style.color = 'var(--primary-color)'
+    setText(link, 'каталогу курсів')
+
+    link.addEventListener('click', (e) => {
       e.preventDefault()
       navigateTo('courses')
     })
+
+    message.appendChild(link)
+    message.appendChild(document.createTextNode('.'))
+    emptyDiv.appendChild(message)
+    myCoursesList.appendChild(emptyDiv)
     return
   }
 
-  myCoursesList.innerHTML = enrolledCourses.map(course => `
-    <div class="course-card" data-course-id="${course.id}">
-      <div class="course-card-image">
-        ${course.icon}
-      </div>
-      <div class="course-card-content">
-        <h3>${course.title}</h3>
-        <div class="course-card-meta">
-          <span>👨‍🏫 ${course.instructor}</span>
-          <span>⏱️ ${course.duration}</span>
-        </div>
-        <p>${course.description}</p>
-        <div class="course-card-footer">
-          <span class="course-progress">${course.progress}% завершено</span>
-          <button class="btn btn-primary btn-continue" data-course-id="${course.id}">
-            Продовжити
-          </button>
-        </div>
-      </div>
-    </div>
-  `).join('')
-
-  // Обробники подій
-  myCoursesList.querySelectorAll('.course-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      if (!e.target.classList.contains('btn')) {
-        const courseId = parseInt(card.dataset.courseId)
-        showCourseDetail(courseId)
-      }
-    })
-  })
-
-  myCoursesList.querySelectorAll('.btn-continue').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      const courseId = parseInt(btn.dataset.courseId)
-      showCourseDetail(courseId)
-    })
+  // Створюємо картки через DOM API
+  enrolledCourses.forEach(course => {
+    const card = createCourseCard(course)
+    myCoursesList.appendChild(card)
   })
 }
 
