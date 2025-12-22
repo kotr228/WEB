@@ -1454,9 +1454,9 @@ function renderProgress() {
   }
 
   // Секція 3: Прогрес по курсах (filter + map)
-  const enrolledCourses = coursesData.filter(c => c.enrolled)
+  const myEnrolledCourses = coursesData.filter(c => c.enrolled)
 
-  if (enrolledCourses.length > 0) {
+  if (myEnrolledCourses.length > 0) {
     const coursesSection = createElement('div', [])
     coursesSection.style.cssText = 'margin-bottom: 2rem;'
 
@@ -1465,7 +1465,7 @@ function renderProgress() {
     coursesTitle.style.cssText = 'margin-bottom: 1.5rem; color: var(--primary-color);'
 
     // Використання map для створення прогрес-барів
-    enrolledCourses.forEach(course => {
+    myEnrolledCourses.forEach(course => {
       const progressCard = createElement('div', [])
       progressCard.style.cssText = 'background: white; padding: 1.5rem; margin-bottom: 1rem; border-radius: 12px; box-shadow: var(--shadow);'
 
