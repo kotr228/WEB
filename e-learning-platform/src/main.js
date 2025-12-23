@@ -1842,6 +1842,328 @@ function createPaginationUI(filteredCourses) {
 }
 
 // =========================================
+// LocalStorage and Client-Side Caching (Модуль 10)
+// =========================================
+
+/**
+ * LocalStorage утиліти
+ */
+const LocalStorageManager = {
+  // Префікс для всіх ключів
+  prefix: 'elearning_',
+
+  /**
+   * Зберігає дані в LocalStorage
+   */
+  save(key, data, ttl = null) {
+    try {
+      const item = {
+        data,
+        timestamp: Date.now(),
+        ttl: ttl // Time To Live в мілісекундах
+      }
+      localStorage.setItem(this.prefix + key, JSON.stringify(item))
+      console.log(`💾 Модуль 10: Збережено "${key}" в LocalStorage`)
+      return true
+    } catch (error) {
+      errorLogger.log(new AppError('Failed to save to LocalStorage', 'STORAGE_ERROR'), {
+        key,
+        error: error.message
+      })
+      return false
+    }
+  },
+
+  /**
+   * Завантажує дані з LocalStorage
+   */
+  load(key) {
+    try {
+      const itemStr = localStorage.getItem(this.prefix + key)
+      if (!itemStr) {
+        return null
+      }
+
+      const item = JSON.parse(itemStr)
+
+      // Перевірка TTL
+      if (item.ttl && Date.now() - item.timestamp > item.ttl) {
+        console.log(`⏰ Модуль 10: Дані "${key}" застаріли, видаляємо`)
+        this.remove(key)
+        return null
+      }
+
+      console.log(`📂 Модуль 10: Завантажено "${key}" з LocalStorage`)
+      return item.data
+    } catch (error) {
+      errorLogger.log(new AppError('Failed to load from LocalStorage', 'STORAGE_ERROR'), {
+        key,
+        error: error.message
+      })
+      return null
+    }
+  },
+
+  /**
+   * Видаляє дані з LocalStorage
+   */
+  remove(key) {
+    try {
+      localStorage.removeItem(this.prefix + key)
+      console.log(`🗑️ Модуль 10: Видалено "${key}" з LocalStorage`)
+      return true
+    } catch (error) {
+      errorLogger.log(new AppError('Failed to remove from LocalStorage', 'STORAGE_ERROR'), {
+        key,
+        error: error.message
+      })
+      return false
+    }
+  },
+
+  /**
+   * Очищує всі дані застосунку
+   */
+  clear() {
+    try {
+      const keys = Object.keys(localStorage).filter(key => key.startsWith(this.prefix))
+      keys.forEach(key => localStorage.removeItem(key))
+      console.log(`🧹 Модуль 10: Очищено ${keys.length} записів з LocalStorage`)
+      return true
+    } catch (error) {
+      errorLogger.log(new AppError('Failed to clear LocalStorage', 'STORAGE_ERROR'), {
+        error: error.message
+      })
+      return false
+    }
+  },
+
+  /**
+   * Отримує розмір даних в LocalStorage
+   */
+  getSize() {
+    let total = 0
+    for (let key in localStorage) {
+      if (key.startsWith(this.prefix)) {
+        total += localStorage[key].length + key.length
+      }
+    }
+    return total
+  },
+
+  /**
+   * Отримує всі ключі застосунку
+   */
+  getAllKeys() {
+    return Object.keys(localStorage)
+      .filter(key => key.startsWith(this.prefix))
+      .map(key => key.replace(this.prefix, ''))
+  }
+}
+
+/**
+ * Зберігає стан додатку в LocalStorage
+ */
+function saveAppState() {
+  const state = {
+    searchQuery: appState.searchQuery,
+    filterEnrolled: appState.filterEnrolled,
+    sortBy: appState.sortBy,
+    paginationMode: paginationState.mode,
+    itemsPerPage: paginationState.itemsPerPage
+  }
+
+  LocalStorageManager.save('appState', state, 24 * 60 * 60 * 1000) // TTL: 24 години
+}
+
+/**
+ * Завантажує стан додатку з LocalStorage
+ */
+function loadAppState() {
+  const state = LocalStorageManager.load('appState')
+
+  if (state) {
+    appState.searchQuery = state.searchQuery || ''
+    appState.filterEnrolled = state.filterEnrolled || 'all'
+    appState.sortBy = state.sortBy || 'default'
+    paginationState.mode = state.paginationMode || 'pagination'
+    paginationState.itemsPerPage = state.itemsPerPage || 6
+
+    console.log('✅ Модуль 10: Стан додатку відновлено з LocalStorage')
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Зберігає курси в LocalStorage
+ */
+function saveCourses() {
+  const coursesWithProgress = coursesData.map(course => ({
+    id: course.id,
+    enrolled: course.enrolled,
+    progress: course.progress,
+    lessons: course.lessons.map(l => ({ id: l.id, completed: l.completed }))
+  }))
+
+  LocalStorageManager.save('coursesProgress', coursesWithProgress, 7 * 24 * 60 * 60 * 1000) // TTL: 7 днів
+}
+
+/**
+ * Завантажує прогрес курсів з LocalStorage
+ */
+function loadCoursesProgress() {
+  const savedProgress = LocalStorageManager.load('coursesProgress')
+
+  if (savedProgress) {
+    savedProgress.forEach(saved => {
+      const course = coursesData.find(c => c.id === saved.id)
+      if (course) {
+        course.enrolled = saved.enrolled
+        course.progress = saved.progress
+        saved.lessons.forEach(savedLesson => {
+          const lesson = course.lessons.find(l => l.id === savedLesson.id)
+          if (lesson) {
+            lesson.completed = savedLesson.completed
+          }
+        })
+      }
+    })
+
+    console.log('✅ Модуль 10: Прогрес курсів відновлено з LocalStorage')
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Експортує дані в JSON
+ */
+function exportData() {
+  const data = {
+    appState: {
+      searchQuery: appState.searchQuery,
+      filterEnrolled: appState.filterEnrolled,
+      sortBy: appState.sortBy
+    },
+    paginationState: {
+      mode: paginationState.mode,
+      itemsPerPage: paginationState.itemsPerPage
+    },
+    courses: coursesData.map(course => ({
+      id: course.id,
+      enrolled: course.enrolled,
+      progress: course.progress
+    })),
+    timestamp: new Date().toISOString(),
+    version: '1.0'
+  }
+
+  const jsonStr = JSON.stringify(data, null, 2)
+  const blob = new Blob([jsonStr], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `elearning-data-${Date.now()}.json`
+  a.click()
+
+  URL.revokeObjectURL(url)
+
+  console.log('📥 Модуль 10: Дані експортовано')
+  showNotification('Дані експортовано у файл', 'success')
+}
+
+/**
+ * Імпортує дані з JSON
+ */
+function importData() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'application/json'
+
+  input.addEventListener('change', async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+
+      // Відновлюємо стан
+      if (data.appState) {
+        appState.searchQuery = data.appState.searchQuery || ''
+        appState.filterEnrolled = data.appState.filterEnrolled || 'all'
+        appState.sortBy = data.appState.sortBy || 'default'
+      }
+
+      if (data.paginationState) {
+        paginationState.mode = data.paginationState.mode || 'pagination'
+        paginationState.itemsPerPage = data.paginationState.itemsPerPage || 6
+      }
+
+      // Відновлюємо прогрес курсів
+      if (data.courses) {
+        data.courses.forEach(saved => {
+          const course = coursesData.find(c => c.id === saved.id)
+          if (course) {
+            course.enrolled = saved.enrolled
+            course.progress = saved.progress
+          }
+        })
+      }
+
+      // Зберігаємо в LocalStorage
+      saveAppState()
+      saveCourses()
+
+      // Оновлюємо UI
+      renderCourses()
+
+      console.log('📤 Модуль 10: Дані імпортовано')
+      showNotification('Дані успішно імпортовано!', 'success')
+    } catch (error) {
+      errorLogger.log(new AppError('Failed to import data', 'IMPORT_ERROR'), {
+        error: error.message
+      })
+      showNotification('Помилка імпорту даних', 'error')
+    }
+  })
+
+  input.click()
+}
+
+/**
+ * Отримує статистику LocalStorage
+ */
+function getStorageStats() {
+  const keys = LocalStorageManager.getAllKeys()
+  const size = LocalStorageManager.getSize()
+  const sizeKB = (size / 1024).toFixed(2)
+
+  return {
+    keys,
+    count: keys.length,
+    size,
+    sizeKB,
+    maxSize: 5 * 1024 * 1024, // 5MB
+    percentUsed: ((size / (5 * 1024 * 1024)) * 100).toFixed(2)
+  }
+}
+
+// Автоматичне збереження при зміні даних
+let autoSaveTimeout
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimeout)
+  autoSaveTimeout = setTimeout(() => {
+    saveAppState()
+    saveCourses()
+  }, 1000) // Debounce 1 секунда
+}
+
+// =========================================
 // Фільтрація та сортування (Модуль 3)
 // =========================================
 
@@ -2464,7 +2786,74 @@ function createSearchAndFilters() {
   })
 
   appendChildren(errorRow, test404Btn, testNetworkBtn, viewLogBtn, statsBtn, clearLogBtn, validationErrorBtn)
-  appendChildren(controlsDiv, topRow, bottomRow, apiRow, errorRow)
+
+  // П'ятий ряд: LocalStorage Demo (Модуль 10)
+  const storageRow = createElement('div', [])
+  storageRow.style.cssText = 'display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; padding-top: 1rem; border-top: 2px dashed #10b981;'
+
+  const storageTitle = createElement('small', ['text-muted', 'w-100'])
+  setText(storageTitle, '💾 LocalStorage (Модуль 10):')
+  storageRow.appendChild(storageTitle)
+
+  // Кнопка: Save State
+  const saveStateBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-success'])
+  setText(saveStateBtn, '💾 Save State')
+  saveStateBtn.addEventListener('click', () => {
+    saveAppState()
+    saveCourses()
+    showNotification('Стан збережено в LocalStorage', 'success')
+  })
+
+  // Кнопка: Load State
+  const loadStateBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-primary'])
+  setText(loadStateBtn, '📂 Load State')
+  loadStateBtn.addEventListener('click', () => {
+    const loaded = loadAppState() && loadCoursesProgress()
+    if (loaded) {
+      renderCourses()
+      showNotification('Стан завантажено з LocalStorage', 'success')
+    } else {
+      showNotification('Немає збережених даних', 'info')
+    }
+  })
+
+  // Кнопка: Storage Stats
+  const storageStatsBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-info'])
+  setText(storageStatsBtn, '📊 Stats')
+  storageStatsBtn.addEventListener('click', () => {
+    const stats = getStorageStats()
+    console.group('💾 LocalStorage Statistics')
+    console.log('Збережених ключів:', stats.count)
+    console.log('Ключі:', stats.keys)
+    console.log('Розмір:', stats.sizeKB + ' KB')
+    console.log('Використано:', stats.percentUsed + '%')
+    console.table(stats)
+    console.groupEnd()
+    showNotification(`LocalStorage: ${stats.sizeKB} KB (${stats.count} ключів)`, 'info')
+  })
+
+  // Кнопка: Clear Storage
+  const clearStorageBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-danger'])
+  setText(clearStorageBtn, '🗑️ Clear All')
+  clearStorageBtn.addEventListener('click', () => {
+    if (confirm('Очистити всі збережені дані?')) {
+      LocalStorageManager.clear()
+      showNotification('LocalStorage очищено', 'success')
+    }
+  })
+
+  // Кнопка: Export Data
+  const exportBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-secondary'])
+  setText(exportBtn, '📥 Export')
+  exportBtn.addEventListener('click', exportData)
+
+  // Кнопка: Import Data
+  const importBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-secondary'])
+  setText(importBtn, '📤 Import')
+  importBtn.addEventListener('click', importData)
+
+  appendChildren(storageRow, saveStateBtn, loadStateBtn, storageStatsBtn, clearStorageBtn, exportBtn, importBtn)
+  appendChildren(controlsDiv, topRow, bottomRow, apiRow, errorRow, storageRow)
 
   return controlsDiv
 }
@@ -2586,6 +2975,9 @@ function enrollCourse(courseId) {
     course.enrolled = true
     renderCourses()
     showNotification(`Ви успішно записались на курс "${course.title}"!`, 'success')
+
+    // Модуль 10: Автозбереження
+    scheduleAutoSave()
   }
 }
 
@@ -3023,6 +3415,9 @@ function completeLesson(courseId, lessonId) {
 
   showNotification('Урок завершено! 🎉', 'success')
   watchLesson(courseId, lessonId) // Перерендерити
+
+  // Модуль 10: Автозбереження
+  scheduleAutoSave()
 }
 
 // =========================================
@@ -3775,6 +4170,10 @@ function showNotification(message, type = 'success') {
 // Ініціалізація додатку
 // =========================================
 function initApp() {
+  // Модуль 10: Завантаження даних з LocalStorage
+  loadAppState()
+  loadCoursesProgress()
+
   // Навігаційні посилання
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
@@ -3892,6 +4291,14 @@ function initApp() {
   console.log('  • Курсів на сторінку: ' + paginationState.itemsPerPage)
   console.log('  • Доступні режими: Пагінація, Load More, Infinite Scroll')
   console.log('  • Intersection Observer API: ✅')
+  console.log('💾 Модуль 10: LocalStorage та кешування активні')
+  console.log('  • Автозбереження: ✅')
+  console.log('  • TTL (Time To Live): ✅')
+  console.log('  • Import/Export: ✅')
+  const stats = getStorageStats()
+  console.log('  • Збережено ключів: ' + stats.count)
+  console.log('  • Розмір даних: ' + stats.sizeKB + ' KB')
+  console.log('  • Використано: ' + stats.percentUsed + '%')
 }
 
 // Запускаємо додаток після завантаження DOM
