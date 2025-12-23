@@ -681,6 +681,211 @@ async function testErrorHandling() {
 }
 
 // =========================================
+// Advanced API Interactions (Модуль 7)
+// =========================================
+
+// Simple cache для API responses
+const apiCache = new Map()
+let abortController = null
+
+/**
+ * Завантажує дані з кешуванням
+ * Демонструє: Cache strategy, AbortController
+ */
+async function loadWithCache(url, cacheTime = 60000) {
+  const cached = apiCache.get(url)
+  const now = Date.now()
+
+  // Перевіряємо кеш
+  if (cached && (now - cached.timestamp) < cacheTime) {
+    console.log('📦 Модуль 7: Дані з кешу', url)
+    return cached.data
+  }
+
+  // Скасовуємо попередній запит, якщо є
+  if (abortController) {
+    abortController.abort()
+  }
+
+  // Створюємо новий AbortController
+  abortController = new AbortController()
+
+  try {
+    const response = await api.get(url, {
+      signal: abortController.signal
+    })
+
+    // Зберігаємо в кеш
+    apiCache.set(url, {
+      data: response.data,
+      timestamp: now
+    })
+
+    console.log('🌐 Модуль 7: Дані з API (закешовано)', url)
+    return response.data
+  } catch (error) {
+    if (error.name === 'CanceledError') {
+      console.log('⏸️ Запит скасовано')
+    }
+    throw error
+  }
+}
+
+/**
+ * Pagination: Завантажує користувачів зі сторінкою
+ * Демонструє: Query parameters, pagination
+ */
+async function loadUsersWithPagination(page = 1, limit = 5) {
+  try {
+    showNotification(`⏳ Завантаження сторінки ${page}...`, 'info')
+
+    const response = await api.get('/users', {
+      params: {
+        _page: page,
+        _limit: limit
+      }
+    })
+
+    console.log(`📄 Модуль 7: Сторінка ${page}, користувачів: ${response.data.length}`)
+
+    return {
+      data: response.data,
+      page,
+      limit,
+      total: parseInt(response.headers['x-total-count'] || '10')
+    }
+  } catch (error) {
+    console.error('❌ Помилка пагінації:', error)
+    throw error
+  }
+}
+
+/**
+ * Оптимістичне оновлення: Оновлює UI одразу, потім синхронізує з API
+ * Демонструє: Optimistic updates, rollback on error
+ */
+async function optimisticUpdate(courseId, updates) {
+  const course = coursesData.find(c => c.id === courseId)
+  if (!course) return
+
+  // Зберігаємо оригінальний стан
+  const originalState = { ...course }
+
+  try {
+    // Оптимістичне оновлення UI (до запиту до API)
+    Object.assign(course, updates)
+    renderCourses()
+
+    showNotification('🔄 Синхронізація з сервером...', 'info')
+
+    // Відправляємо на сервер
+    await updateCourseOnAPI(courseId, updates)
+
+    showNotification('✅ Оновлено!', 'success')
+    console.log('✅ Модуль 7: Оптимістичне оновлення успішне')
+  } catch (error) {
+    // Rollback при помилці
+    Object.assign(course, originalState)
+    renderCourses()
+
+    showNotification('❌ Помилка оновлення, відкат змін', 'error')
+    console.error('❌ Модуль 7: Rollback оптимістичного оновлення')
+  }
+}
+
+/**
+ * Batch requests: Виконує кілька запитів одночасно з обробкою помилок
+ * Демонструє: Promise.allSettled, partial success handling
+ */
+async function batchLoadData(endpoints) {
+  try {
+    showNotification('⏳ Завантаження декількох ресурсів...', 'info')
+
+    // Promise.allSettled - чекає всі проміси, навіть якщо деякі відхиляються
+    const results = await Promise.allSettled(
+      endpoints.map(endpoint => api.get(endpoint))
+    )
+
+    // Аналізуємо результати
+    const successful = results.filter(r => r.status === 'fulfilled').map(r => r.value.data)
+    const failed = results.filter(r => r.status === 'rejected')
+
+    console.log(`✅ Модуль 7: Успішно: ${successful.length}, Помилок: ${failed.length}`)
+
+    if (failed.length > 0) {
+      showNotification(`⚠️ ${successful.length} успішно, ${failed.length} помилок`, 'info')
+    } else {
+      showNotification(`✅ Завантажено всі ${successful.length} ресурсів`, 'success')
+    }
+
+    return { successful, failed }
+  } catch (error) {
+    console.error('❌ Помилка batch запитів:', error)
+    throw error
+  }
+}
+
+/**
+ * Retry механізм з exponential backoff
+ * Демонструє: Retry logic, exponential backoff
+ */
+async function fetchWithRetry(url, maxRetries = 3) {
+  let lastError
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Модуль 7: Спроба ${attempt}/${maxRetries}`)
+
+      const response = await api.get(url)
+      console.log(`✅ Успіх на спробі ${attempt}`)
+      return response.data
+    } catch (error) {
+      lastError = error
+      console.log(`❌ Помилка на спробі ${attempt}`)
+
+      if (attempt < maxRetries) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, attempt - 1) * 1000
+        console.log(`⏳ Чекаємо ${delay}ms перед наступною спробою...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+  }
+
+  throw lastError
+}
+
+/**
+ * Показує loading skeleton під час завантаження
+ */
+function showLoadingSkeleton(container) {
+  container.innerHTML = ''
+
+  for (let i = 0; i < 3; i++) {
+    const skeleton = createElement('div', ['card', 'mb-3'])
+    skeleton.innerHTML = `
+      <div class="card-body">
+        <div class="placeholder-glow">
+          <span class="placeholder col-6"></span>
+          <span class="placeholder col-4"></span>
+          <span class="placeholder col-8"></span>
+        </div>
+      </div>
+    `
+    container.appendChild(skeleton)
+  }
+}
+
+/**
+ * Очищає кеш
+ */
+function clearAPICache() {
+  apiCache.clear()
+  console.log('🗑️ Модуль 7: Кеш очищено')
+  showNotification('Кеш API очищено', 'info')
+}
+
+// =========================================
 // Фільтрація та сортування (Модуль 3)
 // =========================================
 
@@ -1144,7 +1349,81 @@ function createSearchAndFilters() {
   })
 
   appendChildren(bottomRow, filterLabel, filterSelect, sortLabel, sortSelect, resetBtn)
-  appendChildren(controlsDiv, topRow, bottomRow)
+  // Третій ряд: API Demo кнопки (Модуль 7)
+  const apiRow = createElement('div', [])
+  apiRow.style.cssText = 'display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; padding-top: 1rem; border-top: 2px dashed var(--border-color);'
+
+  const apiTitle = createElement('small', ['text-muted', 'w-100'])
+  setText(apiTitle, '🧪 API Демонстрація (Модуль 7):')
+  apiRow.appendChild(apiTitle)
+
+  // Кнопка: Pagination
+  const paginationBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-primary'])
+  setText(paginationBtn, '📄 Pagination')
+  paginationBtn.addEventListener('click', async () => {
+    paginationBtn.disabled = true
+    try {
+      const result = await loadUsersWithPagination(1, 5)
+      console.log('Users page 1:', result)
+      showNotification(`Завантажено ${result.data.length} користувачів`, 'success')
+    } catch (error) {
+      // Handled
+    } finally {
+      paginationBtn.disabled = false
+    }
+  })
+
+  // Кнопка: Cache Demo
+  const cacheBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-secondary'])
+  setText(cacheBtn, '📦 Cache Demo')
+  cacheBtn.addEventListener('click', async () => {
+    cacheBtn.disabled = true
+    try {
+      const data1 = await loadWithCache('/posts/1')
+      setTimeout(async () => {
+        const data2 = await loadWithCache('/posts/1')
+        showNotification('Перевірте console - другий запит з кешу!', 'success')
+        cacheBtn.disabled = false
+      }, 1000)
+    } catch (error) {
+      cacheBtn.disabled = false
+    }
+  })
+
+  // Кнопка: Batch Requests
+  const batchBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-info'])
+  setText(batchBtn, '📦 Batch Requests')
+  batchBtn.addEventListener('click', async () => {
+    batchBtn.disabled = true
+    try {
+      await batchLoadData(['/posts/1', '/posts/2', '/users/1'])
+    } finally {
+      batchBtn.disabled = false
+    }
+  })
+
+  // Кнопка: Retry Demo
+  const retryBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-warning'])
+  setText(retryBtn, '🔄 Retry Demo')
+  retryBtn.addEventListener('click', async () => {
+    retryBtn.disabled = true
+    try {
+      // Симулюємо запит що може fail
+      await fetchWithRetry('/posts/999')
+    } catch (error) {
+      showNotification('Retry вичерпано (перевірте console)', 'error')
+    } finally {
+      retryBtn.disabled = false
+    }
+  })
+
+  // Кнопка: Clear Cache
+  const clearCacheBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-danger'])
+  setText(clearCacheBtn, '🗑️ Clear Cache')
+  clearCacheBtn.addEventListener('click', clearAPICache)
+
+  appendChildren(apiRow, paginationBtn, cacheBtn, batchBtn, retryBtn, clearCacheBtn)
+  appendChildren(controlsDiv, topRow, bottomRow, apiRow)
 
   return controlsDiv
 }
