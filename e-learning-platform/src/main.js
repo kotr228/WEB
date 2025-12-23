@@ -63,6 +63,8 @@ window.ValidationError = ValidationError
 window.NetworkError = NetworkError
 window.APIError = APIError
 
+// Note: renderCourses will be added to window after its definition
+
 // =========================================
 // LocalStorage Integration Functions (Модуль 10)
 // =========================================
@@ -1013,6 +1015,9 @@ function renderCourses() {
     container.appendChild(paginationUI)
   }
 }
+
+// Make renderCourses available globally for pagination module
+window.renderCourses = renderCourses
 
 // =========================================
 // Оновлення лічильника результатів (Модуль 3)

@@ -34,6 +34,9 @@ export function getCoursesForPage(filteredCourses, page) {
  * Створює пагінацію (класична з номерами сторінок)
  */
 export function createPagination(filteredCourses, renderCourses) {
+  // Use global renderCourses if not provided as parameter
+  const renderFn = renderCourses || window.renderCourses
+
   const totalPages = calculateTotalPages(filteredCourses)
   paginationState.totalPages = totalPages
 
@@ -47,7 +50,7 @@ export function createPagination(filteredCourses, renderCourses) {
   prevBtn.addEventListener('click', () => {
     if (paginationState.currentPage > 1) {
       paginationState.currentPage--
-      renderCourses()
+      renderFn()
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   })
@@ -91,7 +94,7 @@ export function createPagination(filteredCourses, renderCourses) {
 
       pageBtn.addEventListener('click', () => {
         paginationState.currentPage = page
-        renderCourses()
+        renderFn()
         window.scrollTo({ top: 0, behavior: 'smooth' })
       })
 
@@ -106,7 +109,7 @@ export function createPagination(filteredCourses, renderCourses) {
   nextBtn.addEventListener('click', () => {
     if (paginationState.currentPage < totalPages) {
       paginationState.currentPage++
-      renderCourses()
+      renderFn()
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   })
@@ -282,6 +285,9 @@ export function setupInfiniteScroll(filteredCourses, createCourseCard) {
  * Перемикач режиму пагінації
  */
 export function createPaginationModeSelector(renderCourses) {
+  // Use global renderCourses if not provided as parameter
+  const renderFn = renderCourses || window.renderCourses
+
   const container = createElement('div', ['pagination-mode-selector', 'mb-3'])
   container.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;'
 
@@ -309,7 +315,7 @@ export function createPaginationModeSelector(renderCourses) {
     btn.addEventListener('click', () => {
       paginationState.mode = mode.value
       paginationState.currentPage = 1
-      renderCourses()
+      renderFn()
       showNotification(`Режим змінено на: ${mode.label}`, 'info')
 
       console.log(`📄 Модуль 9: Режим пагінації змінено на "${mode.label}"`)
@@ -330,6 +336,9 @@ export function createPaginationModeSelector(renderCourses) {
  * Створює UI пагінації залежно від режиму
  */
 export function createPaginationUI(filteredCourses, createCourseCard, renderCourses) {
+  // Use global renderCourses if not provided as parameter
+  const renderFn = renderCourses || window.renderCourses
+
   // Відключаємо Intersection Observer якщо він активний
   if (paginationState.observer) {
     paginationState.observer.disconnect()
@@ -352,7 +361,7 @@ export function createPaginationUI(filteredCourses, createCourseCard, renderCour
 
   // Створюємо відповідний UI залежно від режиму
   if (paginationState.mode === 'pagination') {
-    return createPagination(filteredCourses, renderCourses)
+    return createPagination(filteredCourses, renderFn)
   } else if (paginationState.mode === 'loadmore') {
     const loadMoreContainer = createLoadMoreButton(filteredCourses, createCourseCard)
     loadMoreContainer.id = 'load-more-container'
