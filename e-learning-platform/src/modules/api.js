@@ -127,6 +127,11 @@ api.interceptors.response.use(
  * Демонструє: GET запит, params, error handling
  */
 export async function loadCoursesFromAPI(coursesData, appState, renderCourses) {
+  // Use global functions/objects if not provided as parameters
+  const coursesDataRef = coursesData || window.coursesData
+  const appStateRef = appState || window.appState
+  const renderCoursesRef = renderCourses || window.renderCourses
+
   try {
     // Показуємо loading стан
     showNotification('⏳ Завантаження курсів з API...', 'info')
@@ -140,7 +145,7 @@ export async function loadCoursesFromAPI(coursesData, appState, renderCourses) {
 
     // Трансформуємо дані з API в формат наших курсів
     const apiCourses = response.data.map((post, index) => ({
-      id: appState.nextCourseId++,
+      id: appStateRef.nextCourseId++,
       title: post.title.slice(0, 50), // Обрізаємо довгі назви
       instructor: `API Instructor #${post.userId}`,
       duration: `${Math.floor(Math.random() * 10) + 5} годин`,
@@ -159,7 +164,7 @@ export async function loadCoursesFromAPI(coursesData, appState, renderCourses) {
         }
       ],
       test: {
-        id: appState.nextCourseId,
+        id: appStateRef.nextCourseId,
         questions: [
           {
             question: 'Чи сподобався вам курс?',
@@ -171,10 +176,10 @@ export async function loadCoursesFromAPI(coursesData, appState, renderCourses) {
     }))
 
     // Додаємо курси до масиву
-    coursesData.push(...apiCourses)
+    coursesDataRef.push(...apiCourses)
 
     // Оновлюємо список
-    renderCourses()
+    renderCoursesRef()
 
     showNotification(`✅ Завантажено ${apiCourses.length} курсів з API!`, 'success')
 
@@ -406,7 +411,11 @@ export async function loadUsersWithPagination(page = 1, limit = 5) {
  * Демонструє: Optimistic updates, rollback on error
  */
 export async function optimisticUpdate(courseId, updates, coursesData, renderCourses) {
-  const course = coursesData.find(c => c.id === courseId)
+  // Use global functions/objects if not provided as parameters
+  const coursesDataRef = coursesData || window.coursesData
+  const renderCoursesRef = renderCourses || window.renderCourses
+
+  const course = coursesDataRef.find(c => c.id === courseId)
   if (!course) return
 
   // Зберігаємо оригінальний стан
@@ -415,7 +424,7 @@ export async function optimisticUpdate(courseId, updates, coursesData, renderCou
   try {
     // Оптимістичне оновлення UI (до запиту до API)
     Object.assign(course, updates)
-    renderCourses()
+    renderCoursesRef()
 
     showNotification('🔄 Синхронізація з сервером...', 'info')
 
@@ -427,7 +436,7 @@ export async function optimisticUpdate(courseId, updates, coursesData, renderCou
   } catch (error) {
     // Rollback при помилці
     Object.assign(course, originalState)
-    renderCourses()
+    renderCoursesRef()
 
     showNotification('❌ Помилка оновлення, відкат змін', 'error')
     console.error('❌ Модуль 7: Rollback оптимістичного оновлення')

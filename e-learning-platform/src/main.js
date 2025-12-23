@@ -62,8 +62,10 @@ window.AppError = AppError
 window.ValidationError = ValidationError
 window.NetworkError = NetworkError
 window.APIError = APIError
+window.appState = appState
+window.coursesData = coursesData
 
-// Note: renderCourses will be added to window after its definition
+// Note: renderCourses and createCourseCard will be added to window after their definitions
 
 // =========================================
 // LocalStorage Integration Functions (Модуль 10)
