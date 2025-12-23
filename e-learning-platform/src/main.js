@@ -2002,56 +2002,6 @@ function renderProfile() {
   console.log('📝 Модуль 5: Форма профілю з валідацією створена')
 }
 
-// =========================================
-// Показати сповіщення (Модуль 6: Bootstrap Toast)
-// =========================================
-function showNotification(message, type = 'success') {
-  // Створюємо контейнер для тостів, якщо його немає
-  let toastContainer = document.getElementById('toast-container')
-  if (!toastContainer) {
-    toastContainer = document.createElement('div')
-    toastContainer.id = 'toast-container'
-    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3'
-    toastContainer.style.zIndex = '9999'
-    document.body.appendChild(toastContainer)
-  }
-
-  // Визначаємо колір залежно від типу
-  const bgColor = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-info'
-
-  // Створюємо Bootstrap Toast
-  const toastEl = createElement('div', ['toast', 'align-items-center', 'text-white', bgColor, 'border-0'])
-  toastEl.setAttribute('role', 'alert')
-  toastEl.setAttribute('aria-live', 'assertive')
-  toastEl.setAttribute('aria-atomic', 'true')
-
-  const toastBody = createElement('div', ['d-flex'])
-
-  const messageDiv = createElement('div', ['toast-body'])
-  setText(messageDiv, message)
-
-  const closeBtn = createElement('button', ['btn-close', 'btn-close-white', 'me-2', 'm-auto'])
-  closeBtn.type = 'button'
-  closeBtn.setAttribute('data-bs-dismiss', 'toast')
-  closeBtn.setAttribute('aria-label', 'Close')
-
-  appendChildren(toastBody, messageDiv, closeBtn)
-  toastEl.appendChild(toastBody)
-  toastContainer.appendChild(toastEl)
-
-  // Ініціалізуємо та показуємо Toast через Bootstrap API
-  const toast = new bootstrap.Toast(toastEl, {
-    autohide: true,
-    delay: 3000
-  })
-
-  toast.show()
-
-  // Видаляємо елемент після приховування
-  toastEl.addEventListener('hidden.bs.toast', () => {
-    toastEl.remove()
-  })
-}
 
 // =========================================
 // Ініціалізація додатку
