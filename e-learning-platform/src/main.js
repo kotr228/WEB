@@ -5,6 +5,216 @@ import * as bootstrap from 'bootstrap'
 import axios from 'axios'
 
 // =========================================
+// Custom Error Classes (Модуль 8)
+// =========================================
+
+/**
+ * Базовий клас для всіх помилок додатку
+ */
+class AppError extends Error {
+  constructor(message, code = 'APP_ERROR') {
+    super(message)
+    this.name = this.constructor.name
+    this.code = code
+    this.timestamp = new Date()
+    Error.captureStackTrace(this, this.constructor)
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      code: this.code,
+      message: this.message,
+      timestamp: this.timestamp,
+      stack: this.stack
+    }
+  }
+}
+
+/**
+ * Помилка валідації
+ */
+class ValidationError extends AppError {
+  constructor(message, field = null) {
+    super(message, 'VALIDATION_ERROR')
+    this.field = field
+  }
+}
+
+/**
+ * Мережева помилка
+ */
+class NetworkError extends AppError {
+  constructor(message, statusCode = null, url = null) {
+    super(message, 'NETWORK_ERROR')
+    this.statusCode = statusCode
+    this.url = url
+  }
+}
+
+/**
+ * API помилка
+ */
+class APIError extends AppError {
+  constructor(message, endpoint = null, method = 'GET') {
+    super(message, 'API_ERROR')
+    this.endpoint = endpoint
+    this.method = method
+  }
+}
+
+/**
+ * Error Logger - збирає та логує помилки
+ */
+class ErrorLogger {
+  constructor() {
+    this.errors = []
+    this.maxErrors = 50
+  }
+
+  log(error, context = {}) {
+    const errorEntry = {
+      error: error instanceof Error ? error : new Error(String(error)),
+      context,
+      timestamp: new Date(),
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    }
+
+    this.errors.unshift(errorEntry)
+
+    // Обмежуємо кількість збережених помилок
+    if (this.errors.length > this.maxErrors) {
+      this.errors.pop()
+    }
+
+    // Логуємо в console з деталями
+    console.group(`❌ Error: ${errorEntry.error.name}`)
+    console.error('Message:', errorEntry.error.message)
+    console.error('Code:', errorEntry.error.code)
+    console.error('Context:', context)
+    console.error('Stack:', errorEntry.error.stack)
+    console.error('Timestamp:', errorEntry.timestamp)
+    console.groupEnd()
+
+    // Можна відправити на сервер для моніторингу
+    // this.sendToServer(errorEntry)
+
+    return errorEntry
+  }
+
+  getErrors() {
+    return this.errors
+  }
+
+  clearErrors() {
+    this.errors = []
+    console.log('🗑️ Error log cleared')
+  }
+
+  getErrorStats() {
+    const stats = {}
+    this.errors.forEach(entry => {
+      const name = entry.error.name
+      stats[name] = (stats[name] || 0) + 1
+    })
+    return stats
+  }
+}
+
+// Глобальний error logger
+const errorLogger = new ErrorLogger()
+
+/**
+ * Global Error Handler для uncaught exceptions
+ */
+window.addEventListener('error', (event) => {
+  errorLogger.log(event.error, {
+    type: 'uncaught',
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno
+  })
+
+  // Показуємо user-friendly повідомлення
+  showNotification('Виникла несподівана помилка', 'error')
+
+  // Запобігаємо дефолтному поводженню браузера
+  event.preventDefault()
+})
+
+/**
+ * Global handler для unhandled promise rejections
+ */
+window.addEventListener('unhandledrejection', (event) => {
+  errorLogger.log(event.reason, {
+    type: 'unhandled_rejection',
+    promise: event.promise
+  })
+
+  showNotification('Помилка асинхронної операції', 'error')
+
+  event.preventDefault()
+})
+
+/**
+ * Wrapper для безпечного виконання функцій з error handling
+ */
+function safeExecute(fn, errorHandler = null) {
+  return async function (...args) {
+    try {
+      return await fn.apply(this, args)
+    } catch (error) {
+      errorLogger.log(error, {
+        function: fn.name,
+        arguments: args
+      })
+
+      if (errorHandler) {
+        return errorHandler(error)
+      } else {
+        showNotification(`Помилка: ${error.message}`, 'error')
+        throw error
+      }
+    }
+  }
+}
+
+/**
+ * Показує детальну інформацію про помилку (для розробки)
+ */
+function showErrorDetails(error) {
+  console.group('🔍 Error Details')
+  console.log('Name:', error.name)
+  console.log('Message:', error.message)
+  console.log('Code:', error.code)
+  console.log('Stack:', error.stack)
+
+  if (error instanceof NetworkError) {
+    console.log('Status Code:', error.statusCode)
+    console.log('URL:', error.url)
+  }
+
+  if (error instanceof APIError) {
+    console.log('Endpoint:', error.endpoint)
+    console.log('Method:', error.method)
+  }
+
+  if (error instanceof ValidationError) {
+    console.log('Field:', error.field)
+  }
+
+  console.groupEnd()
+}
+
+// Експортуємо для використання
+window.errorLogger = errorLogger
+window.AppError = AppError
+window.ValidationError = ValidationError
+window.NetworkError = NetworkError
+window.APIError = APIError
+
+// =========================================
 // Налаштування Axios (Модуль 6)
 // =========================================
 
@@ -31,8 +241,16 @@ api.interceptors.request.use(
     return config
   },
   (error) => {
-    console.error('❌ Axios Request Error:', error)
-    return Promise.reject(error)
+    const requestError = new APIError(
+      `Request setup failed: ${error.message}`,
+      error.config?.url,
+      error.config?.method
+    )
+    errorLogger.log(requestError, {
+      type: 'axios_request',
+      config: error.config
+    })
+    return Promise.reject(requestError)
   }
 )
 
@@ -43,32 +261,65 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    console.error('❌ Axios Response Error:', error.message)
+    let customError
+    let errorMessage = ''
 
     if (error.response) {
       // Сервер відповів з кодом помилки
       switch (error.response.status) {
         case 401:
-          console.error('🔒 Unauthorized - потрібна авторизація')
+          errorMessage = '🔒 Unauthorized - потрібна авторизація'
           break
         case 404:
-          console.error('🔍 Not Found - ресурс не знайдено')
+          errorMessage = '🔍 Not Found - ресурс не знайдено'
           break
         case 500:
-          console.error('💥 Server Error - помилка сервера')
+          errorMessage = '💥 Server Error - помилка сервера'
           break
         default:
-          console.error(`⚠️ Error ${error.response.status}:`, error.response.data)
+          errorMessage = `⚠️ HTTP Error ${error.response.status}`
       }
+
+      customError = new NetworkError(
+        errorMessage,
+        error.response.status,
+        error.config?.url
+      )
+      customError.responseData = error.response.data
+
+      errorLogger.log(customError, {
+        type: 'axios_response',
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      })
     } else if (error.request) {
       // Запит був відправлений, але відповіді не було
-      console.error('📡 No response received from server')
+      customError = new NetworkError(
+        '📡 No response received from server',
+        null,
+        error.config?.url
+      )
+
+      errorLogger.log(customError, {
+        type: 'axios_no_response',
+        request: error.request
+      })
     } else {
       // Щось пішло не так при налаштуванні запиту
-      console.error('⚙️ Request configuration error:', error.message)
+      customError = new APIError(
+        `⚙️ Request configuration error: ${error.message}`,
+        error.config?.url,
+        error.config?.method
+      )
+
+      errorLogger.log(customError, {
+        type: 'axios_config_error',
+        originalMessage: error.message
+      })
     }
 
-    return Promise.reject(error)
+    return Promise.reject(customError)
   }
 )
 
@@ -393,51 +644,58 @@ function validateField(field, customRules = {}) {
   const value = field.value
   const fieldName = field.getAttribute('data-label') || field.placeholder || 'Поле'
 
-  // HTML5 валідація через Constraint Validation API
+  // HTML5 валідація через Constraint Validation API (Модуль 8: логування ValidationError)
   if (!field.checkValidity()) {
     const validity = field.validity
+    let errorMessage = ''
 
     if (validity.valueMissing) {
-      showFieldError(field, `${fieldName} є обов'язковим`)
-      return false
-    }
-    if (validity.typeMismatch) {
+      errorMessage = `${fieldName} є обов'язковим`
+    } else if (validity.typeMismatch) {
       if (field.type === 'email') {
-        showFieldError(field, 'Введіть коректну email адресу')
+        errorMessage = 'Введіть коректну email адресу'
       } else if (field.type === 'url') {
-        showFieldError(field, 'Введіть коректний URL')
+        errorMessage = 'Введіть коректний URL'
       } else {
-        showFieldError(field, `Невірний формат для ${fieldName}`)
+        errorMessage = `Невірний формат для ${fieldName}`
       }
-      return false
+    } else if (validity.tooShort) {
+      errorMessage = `Мінімальна довжина: ${field.minLength} символів`
+    } else if (validity.tooLong) {
+      errorMessage = `Максимальна довжина: ${field.maxLength} символів`
+    } else if (validity.rangeUnderflow) {
+      errorMessage = `Мінімальне значення: ${field.min}`
+    } else if (validity.rangeOverflow) {
+      errorMessage = `Максимальне значення: ${field.max}`
+    } else if (validity.patternMismatch) {
+      errorMessage = field.getAttribute('data-pattern-message') || 'Невірний формат'
+    } else if (validity.stepMismatch) {
+      errorMessage = `Значення має бути кратним ${field.step}`
     }
-    if (validity.tooShort) {
-      showFieldError(field, `Мінімальна довжина: ${field.minLength} символів`)
-      return false
-    }
-    if (validity.tooLong) {
-      showFieldError(field, `Максимальна довжина: ${field.maxLength} символів`)
-      return false
-    }
-    if (validity.rangeUnderflow) {
-      showFieldError(field, `Мінімальне значення: ${field.min}`)
-      return false
-    }
-    if (validity.rangeOverflow) {
-      showFieldError(field, `Максимальне значення: ${field.max}`)
-      return false
-    }
-    if (validity.patternMismatch) {
-      showFieldError(field, field.getAttribute('data-pattern-message') || 'Невірний формат')
-      return false
-    }
-    if (validity.stepMismatch) {
-      showFieldError(field, `Значення має бути кратним ${field.step}`)
-      return false
-    }
+
+    showFieldError(field, errorMessage)
+
+    // Логуємо ValidationError для відстеження (Модуль 8)
+    const validationError = new ValidationError(errorMessage, field.id || field.name)
+    errorLogger.log(validationError, {
+      fieldType: field.type,
+      fieldValue: value,
+      validityState: {
+        valueMissing: validity.valueMissing,
+        typeMismatch: validity.typeMismatch,
+        tooShort: validity.tooShort,
+        tooLong: validity.tooLong,
+        rangeUnderflow: validity.rangeUnderflow,
+        rangeOverflow: validity.rangeOverflow,
+        patternMismatch: validity.patternMismatch,
+        stepMismatch: validity.stepMismatch
+      }
+    })
+
+    return false
   }
 
-  // Користувацька валідація
+  // Користувацька валідація (Модуль 8: логування ValidationError)
   for (const [ruleName, ruleConfig] of Object.entries(customRules)) {
     const rule = ValidationRules[ruleName]
     if (!rule) continue
@@ -451,6 +709,16 @@ function validateField(field, customRules = {}) {
     if (!isValid) {
       const message = customRules[`${ruleName}Message`] || `Помилка валідації: ${ruleName}`
       showFieldError(field, message)
+
+      // Логуємо ValidationError для користувацьких правил (Модуль 8)
+      const validationError = new ValidationError(message, field.id || field.name)
+      errorLogger.log(validationError, {
+        fieldType: field.type,
+        fieldValue: value,
+        customRule: ruleName,
+        ruleConfig
+      })
+
       return false
     }
   }
@@ -576,8 +844,23 @@ async function loadCoursesFromAPI() {
 
     return apiCourses
   } catch (error) {
-    console.error('❌ Помилка завантаження курсів:', error)
-    showNotification('❌ Помилка завантаження курсів з API', 'error')
+    // Детальна обробка помилок залежно від типу
+    if (error instanceof NetworkError) {
+      if (error.statusCode === 404) {
+        showNotification('❌ API endpoint не знайдено', 'error')
+      } else if (error.statusCode === 500) {
+        showNotification('❌ Помилка сервера. Спробуйте пізніше', 'error')
+      } else if (!error.statusCode) {
+        showNotification('❌ Немає зв\'язку з сервером', 'error')
+      } else {
+        showNotification(`❌ Помилка завантаження: ${error.message}`, 'error')
+      }
+    } else if (error instanceof APIError) {
+      showNotification('❌ Помилка налаштування запиту', 'error')
+    } else {
+      showNotification('❌ Невідома помилка завантаження курсів', 'error')
+      errorLogger.log(error, { function: 'loadCoursesFromAPI' })
+    }
     throw error
   }
 }
@@ -602,8 +885,23 @@ async function sendCourseToAPI(courseData) {
 
     return response.data
   } catch (error) {
-    console.error('❌ Помилка відправки курсу:', error)
-    showNotification('❌ Помилка відправки на сервер', 'error')
+    // Детальна обробка помилок
+    if (error instanceof NetworkError) {
+      if (error.statusCode === 401) {
+        showNotification('❌ Необхідна авторизація', 'error')
+      } else if (error.statusCode === 403) {
+        showNotification('❌ Доступ заборонено', 'error')
+      } else if (error.statusCode >= 500) {
+        showNotification('❌ Помилка сервера при збереженні', 'error')
+      } else {
+        showNotification('❌ Помилка відправки на сервер', 'error')
+      }
+    } else if (error instanceof APIError) {
+      showNotification('❌ Невірні дані для відправки', 'error')
+    } else {
+      showNotification('❌ Невідома помилка відправки', 'error')
+      errorLogger.log(error, { function: 'sendCourseToAPI', courseData })
+    }
     throw error
   }
 }
@@ -618,7 +916,11 @@ async function updateCourseOnAPI(courseId, updates) {
     console.log('✅ Модуль 6: Курс оновлено', response.data)
     return response.data
   } catch (error) {
-    console.error('❌ Помилка оновлення курсу:', error)
+    if (error instanceof NetworkError) {
+      showNotification(`❌ Помилка оновлення: ${error.message}`, 'error')
+    } else {
+      errorLogger.log(error, { function: 'updateCourseOnAPI', courseId, updates })
+    }
     throw error
   }
 }
@@ -633,7 +935,15 @@ async function deleteCourseFromAPI(courseId) {
     console.log('✅ Модуль 6: Курс видалено з API', response.status)
     return response.data
   } catch (error) {
-    console.error('❌ Помилка видалення курсу:', error)
+    if (error instanceof NetworkError) {
+      if (error.statusCode === 404) {
+        showNotification('❌ Курс не знайдено для видалення', 'error')
+      } else {
+        showNotification(`❌ Помилка видалення курсу`, 'error')
+      }
+    } else {
+      errorLogger.log(error, { function: 'deleteCourseFromAPI', courseId })
+    }
     throw error
   }
 }
@@ -662,21 +972,36 @@ async function loadMultipleResources() {
 
     return { users: users.data, posts: posts.data, comments: comments.data }
   } catch (error) {
-    console.error('❌ Помилка паралельних запитів:', error)
-    showNotification('❌ Помилка завантаження ресурсів', 'error')
+    if (error instanceof NetworkError) {
+      showNotification('❌ Помилка завантаження ресурсів', 'error')
+      console.error('Network Error:', error.message, 'Status:', error.statusCode)
+    } else {
+      showNotification('❌ Невідома помилка паралельних запитів', 'error')
+      errorLogger.log(error, { function: 'loadMultipleResources' })
+    }
     throw error
   }
 }
 
 /**
- * Демонстрація обробки помилок
+ * Демонстрація обробки помилок (Модуль 8)
  */
 async function testErrorHandling() {
   try {
     // Запит до неіснуючого endpoint
     await api.get('/nonexistent-endpoint-404')
   } catch (error) {
-    console.log('✅ Модуль 6: Помилка успішно оброблена interceptor-ом')
+    console.log('✅ Модуль 8: Помилка успішно оброблена')
+    console.log('Тип помилки:', error.constructor.name)
+    console.log('Код помилки:', error.code)
+
+    if (error instanceof NetworkError) {
+      console.log('HTTP Status:', error.statusCode)
+      console.log('URL:', error.url)
+    }
+
+    // Демонструємо що помилка була залогована
+    console.log('Всього помилок у логі:', errorLogger.getErrors().length)
   }
 }
 
@@ -1423,7 +1748,92 @@ function createSearchAndFilters() {
   clearCacheBtn.addEventListener('click', clearAPICache)
 
   appendChildren(apiRow, paginationBtn, cacheBtn, batchBtn, retryBtn, clearCacheBtn)
-  appendChildren(controlsDiv, topRow, bottomRow, apiRow)
+
+  // Четвертий ряд: Error Handling Demo (Модуль 8)
+  const errorRow = createElement('div', [])
+  errorRow.style.cssText = 'display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; padding-top: 1rem; border-top: 2px dashed #dc3545;'
+
+  const errorTitle = createElement('small', ['text-muted', 'w-100'])
+  setText(errorTitle, '⚠️ Обробка помилок (Модуль 8):')
+  errorRow.appendChild(errorTitle)
+
+  // Кнопка: Test 404 Error
+  const test404Btn = createElement('button', ['btn', 'btn-sm', 'btn-outline-danger'])
+  setText(test404Btn, '🔍 Test 404')
+  test404Btn.addEventListener('click', async () => {
+    test404Btn.disabled = true
+    try {
+      await api.get('/nonexistent-resource-404')
+    } catch (error) {
+      console.log('✅ 404 Error caught:', error)
+      showNotification('404 помилка успішно оброблена', 'info')
+    } finally {
+      test404Btn.disabled = false
+    }
+  })
+
+  // Кнопка: Test Network Error
+  const testNetworkBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-warning'])
+  setText(testNetworkBtn, '📡 Test Network')
+  testNetworkBtn.addEventListener('click', async () => {
+    testNetworkBtn.disabled = true
+    try {
+      await api.get('https://invalid-domain-that-does-not-exist-12345.com/api')
+    } catch (error) {
+      console.log('✅ Network error caught:', error)
+      showNotification('Мережева помилка оброблена', 'info')
+    } finally {
+      testNetworkBtn.disabled = false
+    }
+  })
+
+  // Кнопка: View Error Log
+  const viewLogBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-info'])
+  setText(viewLogBtn, '📋 View Log')
+  viewLogBtn.addEventListener('click', () => {
+    const errors = errorLogger.getErrors()
+    console.group('📋 Error Log')
+    console.log(`Всього помилок: ${errors.length}`)
+    errors.forEach((entry, index) => {
+      console.log(`${index + 1}.`, entry.error.name, ':', entry.error.message)
+    })
+    console.groupEnd()
+    showNotification(`Лог містить ${errors.length} помилок`, 'info')
+  })
+
+  // Кнопка: Error Stats
+  const statsBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-secondary'])
+  setText(statsBtn, '📊 Statistics')
+  statsBtn.addEventListener('click', () => {
+    const stats = errorLogger.getErrorStats()
+    console.group('📊 Error Statistics')
+    console.table(stats)
+    console.groupEnd()
+    showNotification('Статистика виведена в console', 'info')
+  })
+
+  // Кнопка: Clear Error Log
+  const clearLogBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-dark'])
+  setText(clearLogBtn, '🗑️ Clear Log')
+  clearLogBtn.addEventListener('click', () => {
+    errorLogger.clearErrors()
+    showNotification('Лог помилок очищено', 'success')
+  })
+
+  // Кнопка: Trigger Validation Error
+  const validationErrorBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-primary'])
+  setText(validationErrorBtn, '✍️ Test Validation')
+  validationErrorBtn.addEventListener('click', () => {
+    try {
+      throw new ValidationError('Email має бути у форматі user@example.com', 'email')
+    } catch (error) {
+      errorLogger.log(error, { trigger: 'manual_test' })
+      showNotification('ValidationError створено', 'info')
+    }
+  })
+
+  appendChildren(errorRow, test404Btn, testNetworkBtn, viewLogBtn, statsBtn, clearLogBtn, validationErrorBtn)
+  appendChildren(controlsDiv, topRow, bottomRow, apiRow, errorRow)
 
   return controlsDiv
 }
@@ -2807,7 +3217,13 @@ function initApp() {
   console.log('⌨️ Клавіатурні скорочення:')
   console.log('  • Ctrl/Cmd + K - Фокус на пошук')
   console.log('  • Escape - Скинути пошук або закрити форму')
-  console.log('  • 1-3 - Перехід між сторінками')
+  console.log('  • 1-4 - Перехід між сторінками')
+  console.log('⚠️ Модуль 8: Обробка помилок активна')
+  console.log('  • Global error handlers: ✅')
+  console.log('  • ErrorLogger: ✅')
+  console.log('  • Custom Error classes: ✅')
+  console.log('  • Axios interceptors: ✅')
+  console.log('  • Form validation logging: ✅')
 }
 
 // Запускаємо додаток після завантаження DOM
