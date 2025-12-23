@@ -64,6 +64,75 @@ window.NetworkError = NetworkError
 window.APIError = APIError
 
 // =========================================
+// LocalStorage Integration Functions (Модуль 10)
+// =========================================
+
+/**
+ * Завантажує стан додатку з LocalStorage
+ */
+function loadAppState() {
+  const savedState = LocalStorageManager.load('appState')
+  if (savedState) {
+    Object.assign(appState, savedState)
+    console.log('📂 Модуль 10: Стан додатку завантажено з LocalStorage')
+    return true
+  }
+  return false
+}
+
+/**
+ * Завантажує прогрес курсів з LocalStorage
+ */
+function loadCoursesProgress() {
+  const savedCourses = LocalStorageManager.load('coursesProgress')
+  if (savedCourses && Array.isArray(savedCourses)) {
+    savedCourses.forEach(savedCourse => {
+      const course = coursesData.find(c => c.id === savedCourse.id)
+      if (course) {
+        Object.assign(course, savedCourse)
+      }
+    })
+    console.log('📂 Модуль 10: Прогрес курсів завантажено з LocalStorage')
+    return true
+  }
+  return false
+}
+
+/**
+ * Зберігає стан додатку в LocalStorage
+ */
+function saveAppState() {
+  const stateToSave = {
+    currentPage: appState.currentPage,
+    searchQuery: appState.searchQuery,
+    filterEnrolled: appState.filterEnrolled,
+    sortBy: appState.sortBy,
+    nextCourseId: appState.nextCourseId
+  }
+  return LocalStorageManager.save('appState', stateToSave)
+}
+
+/**
+ * Зберігає курси в LocalStorage
+ */
+function saveCourses() {
+  return LocalStorageManager.save('coursesProgress', coursesData)
+}
+
+/**
+ * Планує автозбереження з затримкою (debounce)
+ */
+let autoSaveTimeout
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimeout)
+  autoSaveTimeout = setTimeout(() => {
+    saveAppState()
+    saveCourses()
+    console.log('🔄 Модуль 10: Автозбереження виконано')
+  }, 2000)
+}
+
+// =========================================
 // Event Handler Utilities (Модуль 3)
 // =========================================
 
