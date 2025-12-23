@@ -2,15 +2,21 @@
    Глобальні стилі та змінні
    ========================================= */
 :root {
-  --primary-color: #4f46e5;
-  --secondary-color: #7c3aed;
-  --success-color: #10b981;
-  --danger-color: #ef4444;
-  --warning-color: #f59e0b;
-  --bg-color: #f9fafb;
-  --text-color: #1f2937;
-  --border-color: #e5e7eb;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  /* Пастельна палітра */
+  --primary-color: #a7ffd8;
+  --secondary-color: #ffaa7f;
+  --accent-color: #ff9fdc;
+  --bg-color: #ffffef;
+  --success-color: #a7ffd8;
+  --danger-color: #ff9fdc;
+  --warning-color: #ffaa7f;
+  --text-color: #2d3748;
+  --border-color: #e2e8f0;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+
+  /* Градієнти */
+  --gradient-primary: linear-gradient(135deg, #a7ffd8 0%, #ffaa7f 100%);
+  --gradient-secondary: linear-gradient(135deg, #ff9fdc 0%, #ffaa7f 100%);
 }
 
 * {
@@ -44,8 +50,8 @@ body {
    Header & Navigation
    ========================================= */
 #header {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  color: white;
+  background: var(--gradient-primary);
+  color: var(--text-color);
   box-shadow: var(--shadow);
   position: sticky;
   top: 0;
@@ -76,7 +82,7 @@ body {
 }
 
 .nav-link {
-  color: white;
+  color: var(--text-color);
   text-decoration: none;
   font-weight: 500;
   padding: 0.5rem 1rem;
@@ -86,7 +92,8 @@ body {
 
 .nav-link:hover,
 .nav-link.active {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
 }
 
 /* =========================================
