@@ -548,6 +548,9 @@ function createCourseCard(course) {
   return card
 }
 
+// Make createCourseCard available globally for pagination module
+window.createCourseCard = createCourseCard
+
 // =========================================
 // Створення панелі пошуку та фільтрів (Модуль 3)
 // =========================================

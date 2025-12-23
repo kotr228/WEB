@@ -133,6 +133,9 @@ export function createPagination(filteredCourses, renderCourses) {
  * Створює кнопку "Load More"
  */
 export function createLoadMoreButton(filteredCourses, createCourseCard) {
+  // Use global createCourseCard if not provided as parameter
+  const createCardFn = createCourseCard || window.createCourseCard
+
   const loadedCount = paginationState.currentPage * paginationState.itemsPerPage
   const hasMore = loadedCount < filteredCourses.length
 
@@ -161,7 +164,7 @@ export function createLoadMoreButton(filteredCourses, createCourseCard) {
     const coursesToAdd = getCoursesForPage(filteredCourses, paginationState.currentPage)
 
     coursesToAdd.forEach(course => {
-      const card = createCourseCard(course)
+      const card = createCardFn(course)
       coursesList.appendChild(card)
     })
 
@@ -171,7 +174,7 @@ export function createLoadMoreButton(filteredCourses, createCourseCard) {
       oldLoadMore.remove()
     }
 
-    const newLoadMore = createLoadMoreButton(filteredCourses, createCourseCard)
+    const newLoadMore = createLoadMoreButton(filteredCourses, createCardFn)
     newLoadMore.id = 'load-more-container'
     coursesList.parentElement.appendChild(newLoadMore)
   })
@@ -188,6 +191,9 @@ export function createLoadMoreButton(filteredCourses, createCourseCard) {
  * Створює infinite scroll observer
  */
 export function setupInfiniteScroll(filteredCourses, createCourseCard) {
+  // Use global createCourseCard if not provided as parameter
+  const createCardFn = createCourseCard || window.createCourseCard
+
   // Видаляємо попередній observer
   if (paginationState.observer) {
     paginationState.observer.disconnect()
@@ -243,7 +249,7 @@ export function setupInfiniteScroll(filteredCourses, createCourseCard) {
         const coursesToAdd = getCoursesForPage(filteredCourses, paginationState.currentPage)
 
         coursesToAdd.forEach(course => {
-          const card = createCourseCard(course)
+          const card = createCardFn(course)
           coursesList.appendChild(card)
         })
 
@@ -336,8 +342,9 @@ export function createPaginationModeSelector(renderCourses) {
  * Створює UI пагінації залежно від режиму
  */
 export function createPaginationUI(filteredCourses, createCourseCard, renderCourses) {
-  // Use global renderCourses if not provided as parameter
+  // Use global functions if not provided as parameters
   const renderFn = renderCourses || window.renderCourses
+  const createCardFn = createCourseCard || window.createCourseCard
 
   // Відключаємо Intersection Observer якщо він активний
   if (paginationState.observer) {
@@ -363,11 +370,11 @@ export function createPaginationUI(filteredCourses, createCourseCard, renderCour
   if (paginationState.mode === 'pagination') {
     return createPagination(filteredCourses, renderFn)
   } else if (paginationState.mode === 'loadmore') {
-    const loadMoreContainer = createLoadMoreButton(filteredCourses, createCourseCard)
+    const loadMoreContainer = createLoadMoreButton(filteredCourses, createCardFn)
     loadMoreContainer.id = 'load-more-container'
     return loadMoreContainer
   } else if (paginationState.mode === 'infinite') {
-    return setupInfiniteScroll(filteredCourses, createCourseCard)
+    return setupInfiniteScroll(filteredCourses, createCardFn)
   }
 
   return null
