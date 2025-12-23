@@ -90,46 +90,6 @@ function dispatchCustomEvent(eventName, detail = {}) {
   document.dispatchEvent(event)
 }
 
-// =========================================
-// Валідація форм (Модуль 5)
-// =========================================
-
-/**
- * Validation Rules - правила валідації
- */
-const ValidationRules = {
-  required: (value) => value.trim() !== '',
-  email: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
-  minLength: (value, min) => value.length >= min,
-  maxLength: (value, max) => value.length <= max,
-  pattern: (value, regex) => regex.test(value),
-  url: (value) => {
-    try {
-      new URL(value)
-      course.description.toLowerCase().includes(query)
-    )
-  }
-
-  // Фільтр за статусом (change event)
-  if (appState.filterEnrolled === 'enrolled') {
-    filtered = filtered.filter(c => c.enrolled)
-  } else if (appState.filterEnrolled === 'available') {
-    filtered = filtered.filter(c => !c.enrolled)
-  }
-
-  // Сортування (click event)
-  if (appState.sortBy === 'title') {
-    filtered.sort((a, b) => a.title.localeCompare(b.title))
-  } else if (appState.sortBy === 'duration') {
-    filtered.sort((a, b) => {
-      const durationA = parseInt(a.duration) || 0
-      const durationB = parseInt(b.duration) || 0
-      return durationB - durationA
-    })
-  }
-
-  return filtered
-}
 
 // =========================================
 // Робота з масивами та об'єктами (Модуль 4)
