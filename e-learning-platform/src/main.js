@@ -1008,8 +1008,8 @@ function createSearchAndFilters() {
   const topRow = createElement('div', [])
   topRow.style.cssText = 'display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;'
 
-  // Кнопка створення курсу
-  const addCourseBtn = createElement('button', ['btn', 'btn-primary'])
+  // Кнопка створення курсу (Bootstrap btn-success)
+  const addCourseBtn = createElement('button', ['btn', 'btn-success', 'shadow-sm'])
   addCourseBtn.id = 'add-course-btn'
   setText(addCourseBtn, '➕ Створити курс')
   addCourseBtn.addEventListener('click', (e) => {
@@ -1017,10 +1017,9 @@ function createSearchAndFilters() {
     showCreateCourseForm()
   })
 
-  // Кнопка завантаження курсів з API (Модуль 6)
-  const loadFromAPIBtn = createElement('button', ['btn'])
+  // Кнопка завантаження курсів з API (Bootstrap btn-info)
+  const loadFromAPIBtn = createElement('button', ['btn', 'btn-info', 'shadow-sm'])
   loadFromAPIBtn.id = 'load-api-btn'
-  loadFromAPIBtn.style.cssText = 'background-color: #8b5cf6; color: white;'
   setText(loadFromAPIBtn, '🌐 Завантажити з API')
   loadFromAPIBtn.addEventListener('click', async (e) => {
     e.preventDefault()
@@ -1037,12 +1036,12 @@ function createSearchAndFilters() {
     }
   })
 
-  // Поле пошуку (input event + debounce)
-  const searchInput = createElement('input', [])
+  // Поле пошуку (Bootstrap form-control)
+  const searchInput = createElement('input', ['form-control', 'form-control-lg'])
   searchInput.type = 'text'
   searchInput.placeholder = '🔍 Пошук курсів...'
   searchInput.id = 'search-input'
-  searchInput.style.cssText = 'flex: 1; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 8px; min-width: 250px;'
+  searchInput.style.cssText = 'flex: 1; min-width: 250px;'
   searchInput.value = appState.searchQuery
 
   // Обробник input події з debounce
@@ -1074,9 +1073,8 @@ function createSearchAndFilters() {
   filterLabel.style.cssText = 'font-weight: 600; color: var(--text-color);'
   setText(filterLabel, 'Фільтр:')
 
-  const filterSelect = createElement('select', [])
+  const filterSelect = createElement('select', ['form-select'])
   filterSelect.id = 'filter-select'
-  filterSelect.style.cssText = 'padding: 0.5rem; border: 2px solid var(--border-color); border-radius: 8px; cursor: pointer;'
 
   const filterOptions = [
     { value: 'all', text: 'Всі курси' },
@@ -1106,9 +1104,8 @@ function createSearchAndFilters() {
   sortLabel.style.cssText = 'font-weight: 600; color: var(--text-color); margin-left: 1rem;'
   setText(sortLabel, 'Сортування:')
 
-  const sortSelect = createElement('select', [])
+  const sortSelect = createElement('select', ['form-select'])
   sortSelect.id = 'sort-select'
-  sortSelect.style.cssText = 'padding: 0.5rem; border: 2px solid var(--border-color); border-radius: 8px; cursor: pointer;'
 
   const sortOptions = [
     { value: 'default', text: 'За замовчуванням' },
@@ -2372,33 +2369,54 @@ function renderProfile() {
 }
 
 // =========================================
-// Показати сповіщення
+// Показати сповіщення (Модуль 6: Bootstrap Toast)
 // =========================================
 function showNotification(message, type = 'success') {
-  // Видаляємо попереднє сповіщення, якщо є
-  const existing = document.querySelector('.notification')
-  if (existing) {
-    existing.remove()
+  // Створюємо контейнер для тостів, якщо його немає
+  let toastContainer = document.getElementById('toast-container')
+  if (!toastContainer) {
+    toastContainer = document.createElement('div')
+    toastContainer.id = 'toast-container'
+    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3'
+    toastContainer.style.zIndex = '9999'
+    document.body.appendChild(toastContainer)
   }
 
-  const notification = document.createElement('div')
-  notification.className = `notification ${type}`
-  notification.textContent = message
+  // Визначаємо колір залежно від типу
+  const bgColor = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-info'
 
-  document.body.appendChild(notification)
+  // Створюємо Bootstrap Toast
+  const toastEl = createElement('div', ['toast', 'align-items-center', 'text-white', bgColor, 'border-0'])
+  toastEl.setAttribute('role', 'alert')
+  toastEl.setAttribute('aria-live', 'assertive')
+  toastEl.setAttribute('aria-atomic', 'true')
 
-  // Показуємо з анімацією
-  setTimeout(() => {
-    notification.classList.add('show')
-  }, 100)
+  const toastBody = createElement('div', ['d-flex'])
 
-  // Приховуємо через 3 секунди
-  setTimeout(() => {
-    notification.classList.remove('show')
-    setTimeout(() => {
-      notification.remove()
-    }, 300)
-  }, 3000)
+  const messageDiv = createElement('div', ['toast-body'])
+  setText(messageDiv, message)
+
+  const closeBtn = createElement('button', ['btn-close', 'btn-close-white', 'me-2', 'm-auto'])
+  closeBtn.type = 'button'
+  closeBtn.setAttribute('data-bs-dismiss', 'toast')
+  closeBtn.setAttribute('aria-label', 'Close')
+
+  appendChildren(toastBody, messageDiv, closeBtn)
+  toastEl.appendChild(toastBody)
+  toastContainer.appendChild(toastEl)
+
+  // Ініціалізуємо та показуємо Toast через Bootstrap API
+  const toast = new bootstrap.Toast(toastEl, {
+    autohide: true,
+    delay: 3000
+  })
+
+  toast.show()
+
+  // Видаляємо елемент після приховування
+  toastEl.addEventListener('hidden.bs.toast', () => {
+    toastEl.remove()
+  })
 }
 
 // =========================================
