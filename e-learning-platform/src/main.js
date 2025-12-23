@@ -1211,6 +1211,353 @@ function clearAPICache() {
 }
 
 // =========================================
+// Pagination and Infinite Scroll (Модуль 9)
+// =========================================
+
+/**
+ * Стан пагінації
+ */
+const paginationState = {
+  mode: 'pagination', // 'pagination' | 'infinite' | 'loadmore'
+  currentPage: 1,
+  itemsPerPage: 6,
+  totalPages: 1,
+  isLoading: false,
+  hasMore: true,
+  observer: null
+}
+
+/**
+ * Обчислює загальну кількість сторінок
+ */
+function calculateTotalPages(filteredCourses) {
+  return Math.ceil(filteredCourses.length / paginationState.itemsPerPage) || 1
+}
+
+/**
+ * Отримує курси для поточної сторінки
+ */
+function getCoursesForPage(filteredCourses, page) {
+  const startIndex = (page - 1) * paginationState.itemsPerPage
+  const endIndex = startIndex + paginationState.itemsPerPage
+  return filteredCourses.slice(startIndex, endIndex)
+}
+
+/**
+ * Створює пагінацію (класична з номерами сторінок)
+ */
+function createPagination(filteredCourses) {
+  const totalPages = calculateTotalPages(filteredCourses)
+  paginationState.totalPages = totalPages
+
+  const paginationContainer = createElement('div', ['pagination-container'])
+  paginationContainer.style.cssText = 'display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 2rem; flex-wrap: wrap;'
+
+  // Previous button
+  const prevBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-primary'])
+  setText(prevBtn, '« Попередня')
+  prevBtn.disabled = paginationState.currentPage === 1
+  prevBtn.addEventListener('click', () => {
+    if (paginationState.currentPage > 1) {
+      paginationState.currentPage--
+      renderCourses()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  })
+
+  // Page numbers
+  const pageNumbers = createElement('div', [])
+  pageNumbers.style.cssText = 'display: flex; gap: 0.25rem;'
+
+  // Логіка показу номерів сторінок (max 7 кнопок)
+  let pagesToShow = []
+
+  if (totalPages <= 7) {
+    // Показуємо всі сторінки
+    pagesToShow = Array.from({ length: totalPages }, (_, i) => i + 1)
+  } else {
+    // Показуємо з елліпсисом
+    if (paginationState.currentPage <= 3) {
+      pagesToShow = [1, 2, 3, 4, 5, '...', totalPages]
+    } else if (paginationState.currentPage >= totalPages - 2) {
+      pagesToShow = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+    } else {
+      pagesToShow = [1, '...', paginationState.currentPage - 1, paginationState.currentPage, paginationState.currentPage + 1, '...', totalPages]
+    }
+  }
+
+  pagesToShow.forEach(page => {
+    if (page === '...') {
+      const ellipsis = createElement('span', ['px-2'])
+      setText(ellipsis, '...')
+      ellipsis.style.cssText = 'display: flex; align-items: center; color: #6c757d;'
+      pageNumbers.appendChild(ellipsis)
+    } else {
+      const pageBtn = createElement('button', ['btn', 'btn-sm'])
+      if (page === paginationState.currentPage) {
+        pageBtn.classList.add('btn-primary')
+      } else {
+        pageBtn.classList.add('btn-outline-primary')
+      }
+      setText(pageBtn, String(page))
+      pageBtn.style.minWidth = '2.5rem'
+
+      pageBtn.addEventListener('click', () => {
+        paginationState.currentPage = page
+        renderCourses()
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      })
+
+      pageNumbers.appendChild(pageBtn)
+    }
+  })
+
+  // Next button
+  const nextBtn = createElement('button', ['btn', 'btn-sm', 'btn-outline-primary'])
+  setText(nextBtn, 'Наступна »')
+  nextBtn.disabled = paginationState.currentPage === totalPages
+  nextBtn.addEventListener('click', () => {
+    if (paginationState.currentPage < totalPages) {
+      paginationState.currentPage++
+      renderCourses()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  })
+
+  // Page info
+  const pageInfo = createElement('div', ['text-muted', 'small', 'w-100', 'text-center'])
+  pageInfo.style.marginTop = '0.5rem'
+  setText(pageInfo, `Сторінка ${paginationState.currentPage} з ${totalPages} (всього курсів: ${filteredCourses.length})`)
+
+  appendChildren(paginationContainer, prevBtn, pageNumbers, nextBtn)
+  paginationContainer.appendChild(pageInfo)
+
+  return paginationContainer
+}
+
+/**
+ * Створює кнопку "Load More"
+ */
+function createLoadMoreButton(filteredCourses) {
+  const loadedCount = paginationState.currentPage * paginationState.itemsPerPage
+  const hasMore = loadedCount < filteredCourses.length
+
+  if (!hasMore) {
+    const endMessage = createElement('div', ['text-center', 'text-muted', 'my-4'])
+    setText(endMessage, '✓ Всі курси завантажено')
+    return endMessage
+  }
+
+  const container = createElement('div', ['text-center', 'my-4'])
+
+  const loadMoreBtn = createElement('button', ['btn', 'btn-primary', 'btn-lg'])
+  setText(loadMoreBtn, `Завантажити ще (${Math.min(paginationState.itemsPerPage, filteredCourses.length - loadedCount)} курсів)`)
+
+  loadMoreBtn.addEventListener('click', async () => {
+    loadMoreBtn.disabled = true
+    setText(loadMoreBtn, 'Завантаження...')
+
+    // Симулюємо затримку завантаження
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    paginationState.currentPage++
+
+    // Рендеримо додаткові курси без очищення попередніх
+    const coursesList = document.getElementById('courses-list')
+    const coursesToAdd = getCoursesForPage(filteredCourses, paginationState.currentPage)
+
+    coursesToAdd.forEach(course => {
+      const card = createCourseCard(course)
+      coursesList.appendChild(card)
+    })
+
+    // Видаляємо стару кнопку і додаємо нову
+    const oldLoadMore = document.getElementById('load-more-container')
+    if (oldLoadMore) {
+      oldLoadMore.remove()
+    }
+
+    const newLoadMore = createLoadMoreButton(filteredCourses)
+    newLoadMore.id = 'load-more-container'
+    coursesList.parentElement.appendChild(newLoadMore)
+  })
+
+  container.appendChild(loadMoreBtn)
+  return container
+}
+
+/**
+ * Створює infinite scroll observer
+ */
+function setupInfiniteScroll(filteredCourses) {
+  // Видаляємо попередній observer
+  if (paginationState.observer) {
+    paginationState.observer.disconnect()
+  }
+
+  // Створюємо sentinel елемент
+  const sentinel = createElement('div', ['infinite-scroll-sentinel'])
+  sentinel.id = 'scroll-sentinel'
+  sentinel.style.cssText = 'height: 20px; margin: 2rem 0;'
+
+  const loadedCount = paginationState.currentPage * paginationState.itemsPerPage
+  const hasMore = loadedCount < filteredCourses.length
+
+  if (!hasMore) {
+    const endMessage = createElement('div', ['text-center', 'text-muted', 'my-4'])
+    setText(endMessage, '✓ Всі курси завантажено')
+    return endMessage
+  }
+
+  // Створюємо Intersection Observer
+  paginationState.observer = new IntersectionObserver(
+    async (entries) => {
+      const [entry] = entries
+
+      if (entry.isIntersecting && !paginationState.isLoading) {
+        paginationState.isLoading = true
+
+        // Показуємо loading skeleton
+        const coursesList = document.getElementById('courses-list')
+        const loadingIndicator = createElement('div', ['text-center', 'my-4'])
+        loadingIndicator.id = 'infinite-loading'
+
+        const spinner = createElement('div', ['spinner-border', 'text-primary'])
+        spinner.setAttribute('role', 'status')
+        const spinnerText = createElement('span', ['visually-hidden'])
+        setText(spinnerText, 'Завантаження...')
+        spinner.appendChild(spinnerText)
+
+        const loadingText = createElement('div', ['mt-2', 'text-muted'])
+        setText(loadingText, 'Завантаження курсів...')
+
+        appendChildren(loadingIndicator, spinner, loadingText)
+
+        // Додаємо індикатор перед sentinel
+        sentinel.parentElement?.insertBefore(loadingIndicator, sentinel)
+
+        // Симулюємо затримку завантаження
+        await new Promise(resolve => setTimeout(resolve, 800))
+
+        paginationState.currentPage++
+
+        // Додаємо нові курси
+        const coursesToAdd = getCoursesForPage(filteredCourses, paginationState.currentPage)
+
+        coursesToAdd.forEach(course => {
+          const card = createCourseCard(course)
+          coursesList.appendChild(card)
+        })
+
+        // Видаляємо loading індикатор
+        const loader = document.getElementById('infinite-loading')
+        if (loader) {
+          loader.remove()
+        }
+
+        paginationState.isLoading = false
+
+        // Перевіряємо чи є ще курси
+        const newLoadedCount = paginationState.currentPage * paginationState.itemsPerPage
+        if (newLoadedCount >= filteredCourses.length) {
+          paginationState.observer.disconnect()
+          const endMessage = createElement('div', ['text-center', 'text-muted', 'my-4'])
+          setText(endMessage, '✓ Всі курси завантажено')
+          sentinel.replaceWith(endMessage)
+        }
+      }
+    },
+    {
+      root: null,
+      rootMargin: '100px',
+      threshold: 0.1
+    }
+  )
+
+  paginationState.observer.observe(sentinel)
+
+  return sentinel
+}
+
+/**
+ * Перемикач режиму пагінації
+ */
+function createPaginationModeSelector() {
+  const container = createElement('div', ['pagination-mode-selector', 'mb-3'])
+  container.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;'
+
+  const label = createElement('span', ['fw-bold'])
+  setText(label, '📄 Режим відображення:')
+
+  const btnGroup = createElement('div', ['btn-group', 'btn-group-sm'])
+  btnGroup.setAttribute('role', 'group')
+
+  const modes = [
+    { value: 'pagination', label: 'Пагінація', icon: '📃' },
+    { value: 'loadmore', label: 'Load More', icon: '⬇️' },
+    { value: 'infinite', label: 'Infinite Scroll', icon: '∞' }
+  ]
+
+  modes.forEach(mode => {
+    const btn = createElement('button', ['btn'])
+    if (paginationState.mode === mode.value) {
+      btn.classList.add('btn-primary')
+    } else {
+      btn.classList.add('btn-outline-primary')
+    }
+    setText(btn, `${mode.icon} ${mode.label}`)
+
+    btn.addEventListener('click', () => {
+      paginationState.mode = mode.value
+      paginationState.currentPage = 1
+      renderCourses()
+      showNotification(`Режим змінено на: ${mode.label}`, 'info')
+
+      console.log(`📄 Модуль 9: Режим пагінації змінено на "${mode.label}"`)
+    })
+
+    btnGroup.appendChild(btn)
+  })
+
+  appendChildren(container, label, btnGroup)
+  return container
+}
+
+/**
+ * Створює UI пагінації залежно від режиму
+ */
+function createPaginationUI(filteredCourses) {
+  // Видаляємо попередній UI пагінації
+  const oldPagination = document.querySelector('.pagination-container')
+  if (oldPagination) {
+    oldPagination.remove()
+  }
+
+  const oldLoadMore = document.getElementById('load-more-container')
+  if (oldLoadMore) {
+    oldLoadMore.remove()
+  }
+
+  const oldSentinel = document.getElementById('scroll-sentinel')
+  if (oldSentinel) {
+    oldSentinel.remove()
+  }
+
+  // Створюємо відповідний UI залежно від режиму
+  if (paginationState.mode === 'pagination') {
+    return createPagination(filteredCourses)
+  } else if (paginationState.mode === 'loadmore') {
+    const loadMoreContainer = createLoadMoreButton(filteredCourses)
+    loadMoreContainer.id = 'load-more-container'
+    return loadMoreContainer
+  } else if (paginationState.mode === 'infinite') {
+    return setupInfiniteScroll(filteredCourses)
+  }
+
+  return null
+}
+
+// =========================================
 // Фільтрація та сортування (Модуль 3)
 // =========================================
 
@@ -1866,6 +2213,13 @@ function renderCourses() {
   // Отримуємо відфільтровані та відсортовані курси
   const filteredCourses = getFilteredCourses()
 
+  // Додаємо перемикач режиму пагінації (Модуль 9)
+  const modeSelector = createPaginationModeSelector()
+  if (heading && heading.nextSibling) {
+    const controlsNextSibling = controlsPanel.nextSibling
+    container.insertBefore(modeSelector, controlsNextSibling)
+  }
+
   // Якщо немає результатів
   if (filteredCourses.length === 0) {
     const emptyDiv = createElement('div', [])
@@ -1884,14 +2238,32 @@ function renderCourses() {
     return
   }
 
+  // Модуль 9: Відображаємо курси залежно від режиму пагінації
+  let coursesToRender = []
+
+  if (paginationState.mode === 'pagination') {
+    // Класична пагінація - показуємо лише курси для поточної сторінки
+    coursesToRender = getCoursesForPage(filteredCourses, paginationState.currentPage)
+  } else if (paginationState.mode === 'loadmore' || paginationState.mode === 'infinite') {
+    // Load More та Infinite Scroll - показуємо курси від початку до поточної сторінки
+    const endIndex = paginationState.currentPage * paginationState.itemsPerPage
+    coursesToRender = filteredCourses.slice(0, endIndex)
+  }
+
   // Створюємо та додаємо картки курсів через DOM API
-  filteredCourses.forEach(course => {
+  coursesToRender.forEach(course => {
     const card = createCourseCard(course)
     coursesList.appendChild(card)
   })
 
   // Показуємо кількість результатів
   updateResultsCount(filteredCourses.length)
+
+  // Додаємо відповідний UI для пагінації (Модуль 9)
+  const paginationUI = createPaginationUI(filteredCourses)
+  if (paginationUI) {
+    container.appendChild(paginationUI)
+  }
 }
 
 // =========================================
@@ -3224,6 +3596,11 @@ function initApp() {
   console.log('  • Custom Error classes: ✅')
   console.log('  • Axios interceptors: ✅')
   console.log('  • Form validation logging: ✅')
+  console.log('📄 Модуль 9: Пагінація та нескінченний скрол активні')
+  console.log('  • Режим пагінації: ' + paginationState.mode)
+  console.log('  • Курсів на сторінку: ' + paginationState.itemsPerPage)
+  console.log('  • Доступні режими: Пагінація, Load More, Infinite Scroll')
+  console.log('  • Intersection Observer API: ✅')
 }
 
 // Запускаємо додаток після завантаження DOM

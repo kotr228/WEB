@@ -421,6 +421,90 @@ input[type="checkbox"] {
 }
 
 /* =========================================
+   Pagination (Модуль 9)
+   ========================================= */
+.pagination-container {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.pagination-mode-selector {
+  animation: slideDown 0.3s ease-out;
+}
+
+.pagination-mode-selector .btn-group {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pagination-mode-selector .btn {
+  transition: all 0.2s ease;
+}
+
+.pagination-mode-selector .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Infinite scroll loading indicator */
+.infinite-scroll-sentinel {
+  opacity: 0;
+}
+
+#infinite-loading {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Load more button animation */
+#load-more-container button {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+#load-more-container button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+#load-more-container button:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+#load-more-container button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+#load-more-container button:disabled {
+  transform: scale(1);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Pagination page numbers */
+.pagination-container .btn {
+  transition: all 0.2s ease;
+}
+
+.pagination-container .btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.pagination-container .btn-primary {
+  font-weight: 600;
+  box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3);
+}
+
+/* =========================================
    Responsive Design
    ========================================= */
 @media (max-width: 768px) {
