@@ -1527,21 +1527,25 @@ function createPaginationModeSelector() {
  * Створює UI пагінації залежно від режиму
  */
 function createPaginationUI(filteredCourses) {
-  // Видаляємо попередній UI пагінації
-  const oldPagination = document.querySelector('.pagination-container')
-  if (oldPagination) {
-    oldPagination.remove()
+  // Відключаємо Intersection Observer якщо він активний
+  if (paginationState.observer) {
+    paginationState.observer.disconnect()
+    paginationState.observer = null
   }
 
-  const oldLoadMore = document.getElementById('load-more-container')
-  if (oldLoadMore) {
-    oldLoadMore.remove()
-  }
+  // Видаляємо ВСІ можливі елементи пагінації
+  const elementsToRemove = [
+    '.pagination-container',
+    '#load-more-container',
+    '#scroll-sentinel',
+    '#infinite-loading',
+    '.infinite-scroll-sentinel'
+  ]
 
-  const oldSentinel = document.getElementById('scroll-sentinel')
-  if (oldSentinel) {
-    oldSentinel.remove()
-  }
+  elementsToRemove.forEach(selector => {
+    const elements = document.querySelectorAll(selector)
+    elements.forEach(el => el.remove())
+  })
 
   // Створюємо відповідний UI залежно від режиму
   if (paginationState.mode === 'pagination') {
@@ -2213,8 +2217,15 @@ function renderCourses() {
   // Отримуємо відфільтровані та відсортовані курси
   const filteredCourses = getFilteredCourses()
 
+  // Видаляємо старий перемикач режиму, якщо є (Модуль 9)
+  const oldModeSelector = document.getElementById('pagination-mode-selector')
+  if (oldModeSelector) {
+    oldModeSelector.remove()
+  }
+
   // Додаємо перемикач режиму пагінації (Модуль 9)
   const modeSelector = createPaginationModeSelector()
+  modeSelector.id = 'pagination-mode-selector'
   if (heading && heading.nextSibling) {
     const controlsNextSibling = controlsPanel.nextSibling
     container.insertBefore(modeSelector, controlsNextSibling)
