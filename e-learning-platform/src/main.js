@@ -1,4 +1,80 @@
 import './style.css'
+// Модуль 6: Bootstrap та Axios
+import 'bootstrap/dist/css/bootstrap.min.css'
+import * as bootstrap from 'bootstrap'
+import axios from 'axios'
+
+// =========================================
+// Налаштування Axios (Модуль 6)
+// =========================================
+
+// Створення екземпляру Axios з базовою конфігурацією
+const api = axios.create({
+  baseURL: 'https://jsonplaceholder.typicode.com',
+  timeout: 5000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// Request Interceptor - додає токен автентифікації та логування
+api.interceptors.request.use(
+  (config) => {
+    console.log(`📤 Axios Request: ${config.method.toUpperCase()} ${config.url}`)
+
+    // Симуляція додавання токена (якби була справжня авторизація)
+    const token = localStorage.getItem('authToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+
+    return config
+  },
+  (error) => {
+    console.error('❌ Axios Request Error:', error)
+    return Promise.reject(error)
+  }
+)
+
+// Response Interceptor - обробка відповідей та помилок
+api.interceptors.response.use(
+  (response) => {
+    console.log(`📥 Axios Response: ${response.status} ${response.config.url}`)
+    return response
+  },
+  (error) => {
+    console.error('❌ Axios Response Error:', error.message)
+
+    if (error.response) {
+      // Сервер відповів з кодом помилки
+      switch (error.response.status) {
+        case 401:
+          console.error('🔒 Unauthorized - потрібна авторизація')
+          break
+        case 404:
+          console.error('🔍 Not Found - ресурс не знайдено')
+          break
+        case 500:
+          console.error('💥 Server Error - помилка сервера')
+          break
+        default:
+          console.error(`⚠️ Error ${error.response.status}:`, error.response.data)
+      }
+    } else if (error.request) {
+      // Запит був відправлений, але відповіді не було
+      console.error('📡 No response received from server')
+    } else {
+      // Щось пішло не так при налаштуванні запиту
+      console.error('⚙️ Request configuration error:', error.message)
+    }
+
+    return Promise.reject(error)
+  }
+)
+
+// Експортуємо для використання в додатку
+window.bootstrap = bootstrap
+window.api = api
 
 // =========================================
 // Дані курсів (Mock Data)
@@ -437,6 +513,174 @@ function addFieldValidation(field, customRules = {}, validateOnInput = true) {
 }
 
 // =========================================
+// Axios API Functions (Модуль 6)
+// =========================================
+
+/**
+ * Завантажує курси з API (JSONPlaceholder)
+ * Демонструє: GET запит, async/await, обробку помилок
+ */
+async function loadCoursesFromAPI() {
+  try {
+    // Показуємо loading стан
+    showNotification('⏳ Завантаження курсів з API...', 'info')
+
+    // GET запит до API
+    const response = await api.get('/posts', {
+      params: {
+        _limit: 3 // Отримуємо тільки 3 пости для демонстрації
+      }
+    })
+
+    // Трансформуємо дані з API в формат наших курсів
+    const apiCourses = response.data.map((post, index) => ({
+      id: appState.nextCourseId++,
+      title: post.title.slice(0, 50), // Обрізаємо довгі назви
+      instructor: `API Instructor #${post.userId}`,
+      duration: `${Math.floor(Math.random() * 10) + 5} годин`,
+      description: post.body,
+      icon: ['🌐', '📡', '☁️'][index % 3],
+      enrolled: false,
+      progress: 0,
+      isFromAPI: true, // Позначаємо що курс з API
+      lessons: [
+        {
+          id: 1,
+          title: 'Вступний урок',
+          duration: '30 хв',
+          completed: false,
+          videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
+        }
+      ],
+      test: {
+        id: appState.nextCourseId,
+        questions: [
+          {
+            question: 'Чи сподобався вам курс?',
+            options: ['Так', 'Дуже так', 'Неймовірно!', 'Супер!'],
+            correct: 0
+          }
+        ]
+      }
+    }))
+
+    // Додаємо курси до масиву
+    coursesData.push(...apiCourses)
+
+    // Оновлюємо список
+    renderCourses()
+
+    showNotification(`✅ Завантажено ${apiCourses.length} курсів з API!`, 'success')
+
+    console.log('📊 Модуль 6: Курси завантажені з API', apiCourses)
+
+    return apiCourses
+  } catch (error) {
+    console.error('❌ Помилка завантаження курсів:', error)
+    showNotification('❌ Помилка завантаження курсів з API', 'error')
+    throw error
+  }
+}
+
+/**
+ * Відправляє дані курсу на API
+ * Демонструє: POST запит, data payload
+ */
+async function sendCourseToAPI(courseData) {
+  try {
+    showNotification('📤 Відправка курсу на сервер...', 'info')
+
+    // POST запит з даними
+    const response = await api.post('/posts', {
+      title: courseData.title,
+      body: courseData.description,
+      userId: 1
+    })
+
+    console.log('✅ Модуль 6: Курс відправлено на API', response.data)
+    showNotification('✅ Курс успішно відправлено на сервер!', 'success')
+
+    return response.data
+  } catch (error) {
+    console.error('❌ Помилка відправки курсу:', error)
+    showNotification('❌ Помилка відправки на сервер', 'error')
+    throw error
+  }
+}
+
+/**
+ * Оновлює курс на API
+ * Демонструє: PUT запит
+ */
+async function updateCourseOnAPI(courseId, updates) {
+  try {
+    const response = await api.put(`/posts/${courseId}`, updates)
+    console.log('✅ Модуль 6: Курс оновлено', response.data)
+    return response.data
+  } catch (error) {
+    console.error('❌ Помилка оновлення курсу:', error)
+    throw error
+  }
+}
+
+/**
+ * Видаляє курс з API
+ * Демонструє: DELETE запит
+ */
+async function deleteCourseFromAPI(courseId) {
+  try {
+    const response = await api.delete(`/posts/${courseId}`)
+    console.log('✅ Модуль 6: Курс видалено з API', response.status)
+    return response.data
+  } catch (error) {
+    console.error('❌ Помилка видалення курсу:', error)
+    throw error
+  }
+}
+
+/**
+ * Демонстрація паралельних запитів
+ * Демонструє: Promise.all, axios.all
+ */
+async function loadMultipleResources() {
+  try {
+    showNotification('⏳ Завантаження декількох ресурсів...', 'info')
+
+    // Паралельні запити
+    const [users, posts, comments] = await Promise.all([
+      api.get('/users?_limit=3'),
+      api.get('/posts?_limit=3'),
+      api.get('/comments?_limit=5')
+    ])
+
+    console.log('📊 Модуль 6: Паралельні запити виконано')
+    console.log('👥 Users:', users.data)
+    console.log('📝 Posts:', posts.data)
+    console.log('💬 Comments:', comments.data)
+
+    showNotification(`✅ Завантажено: ${users.data.length} користувачів, ${posts.data.length} постів, ${comments.data.length} коментарів`, 'success')
+
+    return { users: users.data, posts: posts.data, comments: comments.data }
+  } catch (error) {
+    console.error('❌ Помилка паралельних запитів:', error)
+    showNotification('❌ Помилка завантаження ресурсів', 'error')
+    throw error
+  }
+}
+
+/**
+ * Демонстрація обробки помилок
+ */
+async function testErrorHandling() {
+  try {
+    // Запит до неіснуючого endpoint
+    await api.get('/nonexistent-endpoint-404')
+  } catch (error) {
+    console.log('✅ Модуль 6: Помилка успішно оброблена interceptor-ом')
+  }
+}
+
+// =========================================
 // Фільтрація та сортування (Модуль 3)
 // =========================================
 
@@ -773,6 +1017,26 @@ function createSearchAndFilters() {
     showCreateCourseForm()
   })
 
+  // Кнопка завантаження курсів з API (Модуль 6)
+  const loadFromAPIBtn = createElement('button', ['btn'])
+  loadFromAPIBtn.id = 'load-api-btn'
+  loadFromAPIBtn.style.cssText = 'background-color: #8b5cf6; color: white;'
+  setText(loadFromAPIBtn, '🌐 Завантажити з API')
+  loadFromAPIBtn.addEventListener('click', async (e) => {
+    e.preventDefault()
+    loadFromAPIBtn.disabled = true
+    setText(loadFromAPIBtn, '⏳ Завантаження...')
+
+    try {
+      await loadCoursesFromAPI()
+    } catch (error) {
+      // Помилка вже оброблена в loadCoursesFromAPI
+    } finally {
+      loadFromAPIBtn.disabled = false
+      setText(loadFromAPIBtn, '🌐 Завантажити з API')
+    }
+  })
+
   // Поле пошуку (input event + debounce)
   const searchInput = createElement('input', [])
   searchInput.type = 'text'
@@ -799,7 +1063,7 @@ function createSearchAndFilters() {
     }
   })
 
-  appendChildren(topRow, addCourseBtn, searchInput)
+  appendChildren(topRow, addCourseBtn, loadFromAPIBtn, searchInput)
 
   // Нижній ряд: Фільтри та сортування
   const bottomRow = createElement('div', [])
@@ -1158,9 +1422,9 @@ function createFormGroup(labelText, inputId, inputType = 'text', placeholder = '
 }
 
 // =========================================
-// Створення нового курсу (Модуль 2)
+// Створення нового курсу (Модуль 2 + Модуль 6)
 // =========================================
-function createCourse(form) {
+async function createCourse(form) {
   const title = form.querySelector('#course-title').value
   const instructor = form.querySelector('#course-instructor').value
   const duration = form.querySelector('#course-duration').value
@@ -1201,6 +1465,13 @@ function createCourse(form) {
 
   // Додаємо курс до масиву
   coursesData.push(newCourse)
+
+  // Відправляємо курс на API (Модуль 6: Axios POST)
+  try {
+    await sendCourseToAPI(newCourse)
+  } catch (error) {
+    console.log('⚠️ Курс створено локально, але не відправлено на сервер')
+  }
 
   // Видаляємо форму
   document.getElementById('create-course-form-container').remove()
