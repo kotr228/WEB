@@ -3775,6 +3775,9 @@ function showNotification(message, type = 'success') {
 // Ініціалізація додатку
 // =========================================
 function initApp() {
+  // Модуль 8: Налаштування глобальних обробників помилок
+  setupGlobalErrorHandlers()
+
   // Модуль 10: Завантаження даних з LocalStorage
   loadAppState()
   loadCoursesProgress()
