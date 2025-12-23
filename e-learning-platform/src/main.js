@@ -5,6 +5,65 @@ import * as bootstrap from 'bootstrap'
 import axios from 'axios'
 
 // =========================================
+// Імпорти модулів
+// =========================================
+
+// Utilities
+import { createElement, setText, appendChildren } from './utils/dom.js'
+import { showNotification } from './utils/notifications.js'
+
+// Modules
+import { errorLogger, AppError, ValidationError, NetworkError, APIError, setupGlobalErrorHandlers } from './modules/errorHandling.js'
+import { LocalStorageManager, getStorageStats } from './modules/localStorage.js'
+import { ValidationRules, validateField, validateForm, addFieldValidation } from './modules/validation.js'
+import {
+  api,
+  loadCoursesFromAPI,
+  sendCourseToAPI,
+  updateCourseOnAPI,
+  deleteCourseFromAPI,
+  loadMultipleResources,
+  loadWithCache,
+  loadUsersWithPagination,
+  optimisticUpdate,
+  batchLoadData,
+  fetchWithRetry,
+  showLoadingSkeleton,
+  clearAPICache
+} from './modules/api.js'
+import {
+  calculateTotalPages,
+  getCoursesForPage,
+  createPagination,
+  createLoadMoreButton,
+  setupInfiniteScroll,
+  createPaginationModeSelector,
+  createPaginationUI
+} from './modules/pagination.js'
+
+// Data
+import { coursesData as initialCoursesData } from './data/courses.js'
+
+// State
+import { appState, paginationState } from './state/appState.js'
+
+// =========================================
+// Application State
+// =========================================
+
+// Initialize coursesData from imported data
+let coursesData = [...initialCoursesData]
+
+// Make available globally for compatibility
+window.bootstrap = bootstrap
+window.api = api
+window.errorLogger = errorLogger
+window.AppError = AppError
+window.ValidationError = ValidationError
+window.NetworkError = NetworkError
+window.APIError = APIError
+
+// =========================================
 // Custom Error Classes (Модуль 8)
 // =========================================
 
