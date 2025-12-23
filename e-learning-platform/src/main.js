@@ -132,6 +132,76 @@ function scheduleAutoSave() {
   }, 2000)
 }
 
+/**
+ * Експортує всі дані у JSON файл
+ */
+function exportData() {
+  const dataToExport = {
+    appState: appState,
+    coursesData: coursesData,
+    exportDate: new Date().toISOString()
+  }
+
+  const dataStr = JSON.stringify(dataToExport, null, 2)
+  const dataBlob = new Blob([dataStr], { type: 'application/json' })
+  const url = URL.createObjectURL(dataBlob)
+
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `elearning-export-${Date.now()}.json`
+  link.click()
+
+  URL.revokeObjectURL(url)
+  showNotification('Дані експортовано успішно', 'success')
+  console.log('📥 Модуль 10: Дані експортовано')
+}
+
+/**
+ * Імпортує дані з JSON файлу
+ */
+function importData() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'application/json'
+
+  input.addEventListener('change', (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const importedData = JSON.parse(event.target.result)
+
+        if (importedData.appState) {
+          Object.assign(appState, importedData.appState)
+        }
+
+        if (importedData.coursesData && Array.isArray(importedData.coursesData)) {
+          coursesData.length = 0
+          coursesData.push(...importedData.coursesData)
+        }
+
+        renderCourses()
+        saveAppState()
+        saveCourses()
+
+        showNotification('Дані імпортовано успішно', 'success')
+        console.log('📤 Модуль 10: Дані імпортовано')
+      } catch (error) {
+        showNotification('Помилка імпорту даних', 'error')
+        errorLogger.log(new AppError('Failed to import data', 'IMPORT_ERROR'), {
+          error: error.message
+        })
+      }
+    }
+
+    reader.readAsText(file)
+  })
+
+  input.click()
+}
+
 // =========================================
 // Event Handler Utilities (Модуль 3)
 // =========================================
