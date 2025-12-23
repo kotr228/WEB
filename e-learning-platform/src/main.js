@@ -203,6 +203,48 @@ function importData() {
 }
 
 // =========================================
+// Filtering and Sorting (Модуль 3)
+// =========================================
+
+/**
+ * Отримує відфільтровані та відсортовані курси
+ */
+function getFilteredCourses() {
+  let filtered = [...coursesData]
+
+  // Фільтр за пошуковим запитом
+  if (appState.searchQuery) {
+    const query = appState.searchQuery.toLowerCase()
+    filtered = filtered.filter(course =>
+      course.title.toLowerCase().includes(query) ||
+      course.description.toLowerCase().includes(query) ||
+      course.category.toLowerCase().includes(query)
+    )
+  }
+
+  // Фільтр за статусом зарахування
+  if (appState.filterEnrolled === 'enrolled') {
+    filtered = filtered.filter(course => course.enrolled === true)
+  } else if (appState.filterEnrolled === 'available') {
+    filtered = filtered.filter(course => !course.enrolled)
+  }
+
+  // Сортування
+  if (appState.sortBy === 'title') {
+    filtered.sort((a, b) => a.title.localeCompare(b.title))
+  } else if (appState.sortBy === 'duration') {
+    filtered.sort((a, b) => {
+      const durationA = parseInt(a.duration)
+      const durationB = parseInt(b.duration)
+      return durationA - durationB
+    })
+  }
+  // 'default' - залишаємо в оригінальному порядку
+
+  return filtered
+}
+
+// =========================================
 // Event Handler Utilities (Модуль 3)
 // =========================================
 
