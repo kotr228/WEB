@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>Контакти — АртПростір</title>
+</head>
+<body>
+
+<h1>Контакти та реєстрація</h1>
+
+<p>
+  <a href="index.html">Головна</a> |
+  <a href="about.html">Про майданчик</a> |
+  <a href="exhibitions.html">Виставки</a> |
+  <a href="gallery.html">Галерея</a> |
+  <a href="prices.html">Ціни</a> |
+  <a href="contacts.html">Контакти та реєстрація</a>
+</p>
+<hr>
+
+<h2>Як нас знайти</h2>
+<p>Адреса: <br>
+Телефон: <br>
+Email: </p>
+
+<h2>Реєстрація на майстер-клас</h2>
+<form>
+  <p>
+    <label for="name">Ваше ім'я:</label>
+    <input type="text" id="name" name="name" required>
+  </p>
+  <p>
+    <label for="email">Електронна пошта:</label>
+    <input type="email" id="email" name="email" required>
+  </p>
+  <p>
+    <label for="topic">Оберіть напрям:</label>
+    <select id="topic" name="topic">
+      <option value="painting">Живопис</option>
+      <option value="photo">Фотографія</option>
+      <option value="design">Дизайн</option>
+    </select>
+  </p>
+  <p>
+    <input type="checkbox" id="news" name="news" checked>
+    <label for="news">Хочу отримувати новини майданчика</label>
+  </p>
+  <p>
+    <label for="message">Коментар:</label><br>
+    <textarea id="message" name="message" rows="4" placeholder="Ваше повідомлення..."></textarea>
+  </p>
+  <p>
+    <button type="submit">Зареєструватися</button>
+  </p>
+</form>
+
+</body>
+</html>
